@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Klartex — PDF generation via LaTeX</title>
+  <meta name="description" content="Open-source CLI tool and Python library that generates professional PDF documents from JSON data via XeLaTeX.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.6;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+    h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+    .tagline { color: #555; font-size: 1.1rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.5rem; }
+    p, li { margin-bottom: 0.5rem; }
+    ul { padding-left: 1.5rem; }
+    pre {
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+    code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+    a { color: #1a6dd4; }
+    .templates-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+    .templates-table td, .templates-table th {
+      text-align: left;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid #eee;
+    }
+    .templates-table th { font-weight: 600; border-bottom: 2px solid #ddd; }
+    .templates-table code { background: #f5f5f5; padding: 0.15rem 0.35rem; border-radius: 3px; }
+    footer { margin-top: 3rem; color: #888; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<h1>Klartex</h1>
+<p class="tagline">PDF generation via LaTeX &mdash; structured data in, professional documents out.</p>
+
+<p>Klartex is an open-source CLI tool and Python library that generates professional PDF documents from JSON data. It uses XeLaTeX under the hood.</p>
+
+<h2>Install</h2>
+<pre><code>pip install klartex</code></pre>
+<p>Requires Python &ge; 3.12 and XeLaTeX (<code>brew install --cask mactex</code> or <code>apt install texlive-xetex</code>).</p>
+
+<h2>Templates</h2>
+<table class="templates-table">
+  <tr><th>Template</th><th>Description</th></tr>
+  <tr><td><code>_block</code></td><td>Universal block engine &mdash; compose documents freely from typed blocks</td></tr>
+  <tr><td><code>faktura</code></td><td>Invoice with line items, VAT, and payment info</td></tr>
+  <tr><td><code>protokoll</code></td><td>Meeting minutes with agenda, decisions, and adjusters</td></tr>
+</table>
+
+<h2>Usage</h2>
+<pre><code># Generate a PDF from JSON data
+klartex -t faktura -d invoice.json
+
+# Pipe JSON via stdin (defaults to block engine)
+echo '{ "body": [...] }' | klartex
+
+# Show the JSON Schema for a template
+klartex schema faktura
+
+# Start HTTP API server
+klartex serve --port 8000</code></pre>
+
+<h2>Example: Invoice</h2>
+<pre><code>{
+  "invoice_number": "2026-001",
+  "date": "2026-02-15",
+  "due_date": "2026-03-17",
+  "recipient": {
+    "name": "Kundforetaget AB",
+    "org_number": "556123-4567",
+    "address_line1": "Storgatan 1",
+    "address_line2": "123 45 Stockholm"
+  },
+  "lines": [
+    {
+      "description": "Consulting services",
+      "quantity": 40,
+      "unit": "hrs",
+      "unit_price": 1200.00,
+      "vat_percent": 25
+    }
+  ],
+  "bankgiro": "1234-5678",
+  "note": "Thank you!"
+}</code></pre>
+<p>Save as <code>invoice.json</code>, then run: <code>klartex -t faktura -d invoice.json</code></p>
+
+<h2>Links</h2>
+<ul>
+  <li><a href="https://pypi.org/project/klartex/">PyPI</a></li>
+  <li><a href="https://github.com/swedev/klartex">GitHub</a></li>
+  <li><a href="/llms.txt">llms.txt</a></li>
+</ul>
+
+<footer>MIT License &middot; <a href="https://github.com/swedev/klartex">swedev/klartex</a></footer>
+
+</body>
+</html>

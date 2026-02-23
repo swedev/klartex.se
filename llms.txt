@@ -1,0 +1,96 @@
+# Klartex
+
+> PDF generation via LaTeX — structured data in, professional documents out.
+
+Klartex is an open-source CLI tool and Python library that generates professional PDF documents from JSON data. It uses XeLaTeX under the hood.
+
+## Quick start
+
+```bash
+pip install klartex
+```
+
+Requires XeLaTeX (`brew install --cask mactex` or `apt install texlive-xetex`).
+
+## Generate a PDF
+
+```bash
+# Write JSON data to a file, then render
+klartex -t faktura -d invoice.json
+
+# Or pipe JSON via stdin
+echo '{"invoice_number": "2026-001", ...}' | klartex -t faktura
+```
+
+## Available templates
+
+- `_block` — Universal block engine. The agent composes the document freely from typed blocks.
+- `faktura` — Invoice with line items, VAT, and payment info.
+- `protokoll` — Meeting minutes with agenda, decisions, and adjusters.
+
+## Get the JSON Schema for a template
+
+```bash
+klartex schema faktura
+```
+
+## Invoice example (template: faktura)
+
+```json
+{
+  "invoice_number": "2026-001",
+  "date": "2026-02-15",
+  "due_date": "2026-03-17",
+  "recipient": {
+    "name": "Kundföretaget AB",
+    "org_number": "556123-4567",
+    "address_line1": "Storgatan 1",
+    "address_line2": "123 45 Stockholm"
+  },
+  "lines": [
+    {
+      "description": "Consulting services",
+      "quantity": 40,
+      "unit": "hrs",
+      "unit_price": 1200.00,
+      "vat_percent": 25
+    }
+  ],
+  "bankgiro": "1234-5678",
+  "note": "Thank you!"
+}
+```
+
+Save as `invoice.json`, then run: `klartex -t faktura -d invoice.json`
+
+## Block engine example (template: _block)
+
+```json
+{
+  "lang": "en",
+  "body": [
+    { "type": "heading", "text": "My Document" },
+    { "type": "text", "text": "Hello world." },
+    {
+      "type": "signatures",
+      "parties": [
+        { "name": "Company AB", "signatory": "Anna Andersson" }
+      ]
+    }
+  ]
+}
+```
+
+Save as `doc.json`, then run: `klartex -d doc.json`
+
+## Block types (for _block template)
+
+heading, text, title_page, parties, clause, signatures, metadata_table, attendees, agenda, name_roster, adjuster_signatures, page_break, latex
+
+Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API.
+
+## Links
+
+- PyPI: https://pypi.org/project/klartex/
+- GitHub: https://github.com/swedev/klartex
+- Homepage: https://klartex.se
