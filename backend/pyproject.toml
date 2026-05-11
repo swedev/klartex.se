@@ -1,10 +1,10 @@
 [project]
 name = "klartex-se-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "HTTP backend for klartex.se — wraps klartex as a library"
 requires-python = ">=3.12"
 dependencies = [
-    "klartex==0.11.0",
+    "klartex==0.11.1",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",

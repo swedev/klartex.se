@@ -24,8 +24,12 @@ echo "→ deploying to $SSH_USER@$HOST"
 # --- Push infra files (compose + caddyfile + .env) --------------------------
 [[ -f "$REPO_ROOT/infra/.env" ]] || { echo "infra/.env not found — copy from .env.example first"; exit 1; }
 
+# Ensure persistent dirs exist on the server (cloud-init only runs once,
+# so we don't rely on it for dirs added after initial provisioning).
+$SSH "sudo mkdir -p /srv/klartex/page-templates && sudo chown -R klartex:klartex /srv/klartex/page-templates"
+
 rsync -av --delete \
-    --exclude=caddy-data --exclude=caddy-config \
+    --exclude=caddy-data --exclude=caddy-config --exclude=page-templates \
     "$REPO_ROOT/infra/" "$SSH_USER@$HOST:/srv/klartex/"
 
 # --- Push landing page (index.html, llms.txt) -------------------------------
