@@ -1,0 +1,60 @@
+name: Build and publish backend image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Image tag (e.g. 0.1.0). Defaults to short SHA.'
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from pyproject.toml
+        id: meta
+        run: |
+          ver=$(python3 -c "import tomllib,sys; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          input_ver="${{ github.event.inputs.version }}"
+          if [[ -n "$input_ver" ]]; then ver="$input_ver"; fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: tags
+        with:
+          images: ghcr.io/swedev/klartex-se-backend
+          tags: |
+            type=raw,value=${{ steps.meta.outputs.version }}
+            type=raw,value=${{ steps.meta.outputs.sha }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ steps.tags.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
