@@ -9,6 +9,12 @@ RUN tlmgr install xetex fontspec fancyhdr geometry xcolor titlesec enumitem \
         lastpage hyperref parskip setspace etoolbox booktabs tools \
         collection-fontsrecommended
 
+# texlive/texlive installs binaries to /usr/local/texlive/<year>/bin/<arch>/
+# but only adds them to PATH via /etc/profile (login shell). uvicorn runs
+# non-interactive, so symlink the arch-specific bin dir to a stable path
+# and add it to ENV PATH.
+RUN ln -s "$(ls -d /usr/local/texlive/*/bin/* | head -1)" /usr/local/texlive-bin
+
 # Build wheel separately so dependency layer caches between source changes.
 WORKDIR /app
 COPY pyproject.toml ./
@@ -21,7 +27,7 @@ RUN python3 -m venv /opt/venv \
 
 COPY src/ ./src/
 
-ENV PATH="/opt/venv/bin:$PATH" \
+ENV PATH="/usr/local/texlive-bin:/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
     PYTHONUNBUFFERED=1
 
