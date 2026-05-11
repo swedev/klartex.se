@@ -1,0 +1,92 @@
+#cloud-config
+# Initial provisioning for klartex.se Hetzner server.
+# Usage: passed via --user-data to `hcloud server create`.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - ufw
+  - unattended-upgrades
+  - fail2ban
+
+users:
+  - name: klartex
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      # Filled in by provision.sh from ~/.ssh/id_ed25519.pub before submitting
+      - SSH_PUBLIC_KEY_PLACEHOLDER
+
+write_files:
+  - path: /etc/apt/keyrings/docker.asc.url
+    content: |
+      https://download.docker.com/linux/ubuntu/gpg
+    permissions: '0644'
+
+  - path: /etc/systemd/system/klartex-stack.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=klartex.se Docker Compose stack
+      Requires=docker.service
+      After=docker.service network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      WorkingDirectory=/srv/klartex
+      ExecStart=/usr/bin/docker compose up -d --remove-orphans
+      ExecStop=/usr/bin/docker compose down
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/unattended-upgrades/20auto-upgrades
+    permissions: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+runcmd:
+  # Install Docker Engine + Compose plugin via official repository
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+    https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    > /etc/apt/sources.list.d/docker.list
+  - apt-get update -y
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+
+  # UFW firewall — SSH + HTTP + HTTPS only
+  - ufw --force enable
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+
+  # Prepare deployment directory; deploy.sh rsyncs into here.
+  - mkdir -p /srv/klartex /srv/klartex/caddy-data /srv/klartex/caddy-config /srv/site /srv/app
+  - chown -R klartex:klartex /srv/klartex /srv/site /srv/app
+
+  # Lock SSH down: no root, no password.
+  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - systemctl reload ssh
+
+  # Enable (but do not start — compose file isn't deployed yet) the stack unit.
+  - systemctl daemon-reload
+  - systemctl enable klartex-stack.service
+
+final_message: "klartex.se server provisioned. Run deploy/deploy.sh to push compose + caddyfile."

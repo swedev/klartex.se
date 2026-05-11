@@ -1,0 +1,64 @@
+# klartex.se production Caddy config.
+# Three vhosts share automatic Let's Encrypt TLS.
+
+{
+    email matte@insector.se
+    # Uncomment during initial DNS testing:
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# 1. Landing page — static index.html committed in this repo.
+klartex.se, www.klartex.se {
+    root * /srv/site
+    file_server
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+    }
+    # www → apex
+    @www host www.klartex.se
+    redir @www https://klartex.se{uri} permanent
+}
+
+# 2. Webapp — Vite-built static bundle.
+app.klartex.se {
+    root * /srv/app
+    encode zstd gzip
+    try_files {path} /index.html   # SPA fallback
+    file_server
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        # Tiptap + future API calls
+        Content-Security-Policy   "default-src 'self'; connect-src 'self' https://api.klartex.se; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+}
+
+# 3. API — proxied to klartex container on loopback.
+api.klartex.se {
+    encode zstd gzip
+    @cors_preflight method OPTIONS
+    handle @cors_preflight {
+        header {
+            Access-Control-Allow-Origin  "https://app.klartex.se"
+            Access-Control-Allow-Methods "GET, POST, OPTIONS"
+            Access-Control-Allow-Headers "Content-Type, Authorization"
+            Access-Control-Max-Age       "86400"
+        }
+        respond 204
+    }
+    header {
+        Access-Control-Allow-Origin "https://app.klartex.se"
+        Vary                        "Origin"
+        Strict-Transport-Security   "max-age=31536000; includeSubDomains"
+    }
+    reverse_proxy klartex:8000 {
+        # PDF responses can be a few MB; keep timeouts generous.
+        transport http {
+            response_header_timeout 60s
+        }
+    }
+}
