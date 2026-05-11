@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN tlmgr install xetex fontspec fancyhdr geometry xcolor titlesec enumitem \
         lastpage hyperref parskip setspace etoolbox booktabs tools \
-        siunitx tcolorbox \
-        collection-fontsrecommended
+        siunitx \
+        collection-latexextra collection-fontsrecommended
 
 # texlive/texlive installs binaries to /usr/local/texlive/<year>/bin/<arch>/
 # but only adds them to PATH via /etc/profile (login shell). uvicorn runs
