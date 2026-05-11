@@ -1,17 +1,17 @@
 # klartex.se production stack.
 # Deployed to /srv/klartex/docker-compose.yml on the Hetzner server.
-# Pinned version comes from .env (KLARTEX_VERSION); never use :latest in prod.
+# Pinned version comes from .env (BACKEND_VERSION); never use :latest in prod.
 
 services:
-  klartex:
-    image: ghcr.io/swedev/klartex:${KLARTEX_VERSION}
-    container_name: klartex-api
+  backend:
+    image: ghcr.io/swedev/klartex-se-backend:${BACKEND_VERSION}
+    container_name: klartex-se-backend
     restart: unless-stopped
     # Bind to loopback only — Caddy is the public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/templates"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -32,5 +32,5 @@ services:
       - ./caddy-data:/data              # certificates
       - ./caddy-config:/config
     depends_on:
-      klartex:
+      backend:
         condition: service_healthy

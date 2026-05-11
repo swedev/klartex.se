@@ -55,7 +55,7 @@ api.klartex.se {
         Vary                        "Origin"
         Strict-Transport-Security   "max-age=31536000; includeSubDomains"
     }
-    reverse_proxy klartex:8000 {
+    reverse_proxy backend:8000 {
         # PDF responses can be a few MB; keep timeouts generous.
         transport http {
             response_header_timeout 60s
