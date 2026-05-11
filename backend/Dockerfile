@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN tlmgr install xetex fontspec fancyhdr geometry xcolor titlesec enumitem \
-        lastpage hyperref parskip setspace etoolbox booktabs tabularx tools \
+        lastpage hyperref parskip setspace etoolbox booktabs tools \
         collection-fontsrecommended
 
 # Build wheel separately so dependency layer caches between source changes.
