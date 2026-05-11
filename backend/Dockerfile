@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN tlmgr install xetex fontspec fancyhdr geometry xcolor titlesec enumitem \
         lastpage hyperref parskip setspace etoolbox booktabs tools \
+        siunitx tcolorbox \
         collection-fontsrecommended
 
 # texlive/texlive installs binaries to /usr/local/texlive/<year>/bin/<arch>/
