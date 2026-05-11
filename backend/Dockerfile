@@ -1,22 +1,18 @@
-FROM texlive/texlive:latest-minimal AS base
+# Full TeX Live image — has everything klartex might need (tcolorbox,
+# tikzfill, siunitx, fontspec, …) pre-installed. ~7 GB image, but build
+# time is ~5 min instead of ~50+ min (no tlmgr install step). On the
+# cax11 server (40 GB disk) the size is irrelevant; iteration speed wins.
+FROM texlive/texlive:latest
 
-# Python + XeLaTeX packages klartex needs at render time.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-pip python3-venv curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN tlmgr install xetex fontspec fancyhdr geometry xcolor titlesec enumitem \
-        lastpage hyperref parskip setspace etoolbox booktabs tools \
-        siunitx \
-        collection-latexextra collection-fontsrecommended
-
-# texlive/texlive installs binaries to /usr/local/texlive/<year>/bin/<arch>/
-# but only adds them to PATH via /etc/profile (login shell). uvicorn runs
+# texlive/texlive sets PATH via /etc/profile (login shell). uvicorn runs
 # non-interactive, so symlink the arch-specific bin dir to a stable path
 # and add it to ENV PATH.
 RUN ln -s "$(ls -d /usr/local/texlive/*/bin/* | head -1)" /usr/local/texlive-bin
 
-# Build wheel separately so dependency layer caches between source changes.
 WORKDIR /app
 COPY pyproject.toml ./
 RUN python3 -m venv /opt/venv \
