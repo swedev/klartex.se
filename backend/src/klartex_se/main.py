@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from klartex_se import __version__
 from klartex_se.discovery import router as discovery_router
+from klartex_se.page_template_router import router as page_template_router
 from klartex_se.render import router as render_router
 
 app = FastAPI(
@@ -13,6 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(discovery_router)
+app.include_router(page_template_router)
 app.include_router(render_router)
 
 

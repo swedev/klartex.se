@@ -77,7 +77,7 @@ runcmd:
   - ufw allow 443/tcp
 
   # Prepare deployment directory; deploy.sh rsyncs into here.
-  - mkdir -p /srv/klartex /srv/klartex/caddy-data /srv/klartex/caddy-config /srv/site /srv/app
+  - mkdir -p /srv/klartex /srv/klartex/caddy-data /srv/klartex/caddy-config /srv/klartex/page-templates /srv/site /srv/app
   - chown -R klartex:klartex /srv/klartex /srv/site /srv/app
 
   # Lock SSH down: no root, no password.

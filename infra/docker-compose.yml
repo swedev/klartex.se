@@ -10,6 +10,13 @@ services:
     # Bind to loopback only — Caddy is the public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      PAGE_TEMPLATES_DIR: /data/page-templates
+    volumes:
+      # Persistent storage for uploaded page-template bundles.
+      # Lives outside the container so docker compose pull doesn't wipe them.
+      - /srv/klartex/page-templates:/data/page-templates
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s

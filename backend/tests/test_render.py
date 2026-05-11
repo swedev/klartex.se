@@ -1,5 +1,6 @@
-"""Render endpoint — requires xelatex to be on PATH."""
+"""Render endpoint — requires xelatex to be on PATH for actual renders."""
 
+import base64
 import shutil
 
 import pytest
@@ -11,6 +12,12 @@ client = TestClient(app)
 
 XELATEX = shutil.which("xelatex")
 needs_xelatex = pytest.mark.skipif(XELATEX is None, reason="xelatex not on PATH")
+
+
+def b64(s: str | bytes) -> str:
+    if isinstance(s, str):
+        s = s.encode()
+    return base64.b64encode(s).decode()
 
 
 @needs_xelatex
@@ -49,3 +56,36 @@ def test_render_unknown_template_returns_400():
     r = client.post("/render", json={"template": "nope", "data": {}})
     assert r.status_code == 400
     assert r.json()["detail"]["type"] == "input_error"
+
+
+def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch):
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
+    r = client.post(
+        "/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": "never-registered",
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["type"] == "unknown_page_template"
+
+
+def test_render_builtin_page_template_passes_through(tmp_path, monkeypatch):
+    """Built-in names (formal/clean/none) skip the bundle lookup."""
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
+    # No bundle named "formal" exists; should NOT 400. With xelatex absent
+    # we expect a render_error 500 (or success if xelatex present).
+    r = client.post(
+        "/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": "formal",
+        },
+    )
+    assert r.status_code in (200, 500)
+    if r.status_code == 400:
+        # If we ever get here, the built-in passthrough broke.
+        assert r.json()["detail"]["type"] != "unknown_page_template"

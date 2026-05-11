@@ -17,7 +17,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir \
-        klartex==0.11.0 \
+        klartex==0.11.1 \
         "fastapi>=0.115.0" \
         "uvicorn[standard]>=0.34.0" \
         "python-multipart>=0.0.20"
