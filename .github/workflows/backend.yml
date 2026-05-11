@@ -49,6 +49,52 @@ jobs:
             type=raw,value=${{ steps.meta.outputs.sha }}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # 1. Build amd64 first and LOAD into the runner — so we can actually
+      #    run it and smoke-test before pushing. arm64 push happens only
+      #    after smoke-test passes. This catches runtime failures (missing
+      #    LaTeX packages, PATH issues, etc) that "docker build success"
+      #    alone does not detect.
+      - uses: docker/build-push-action@v6
+        id: build_amd64
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          load: true
+          tags: smoke-test:amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test (render a minimal block-engine PDF)
+        run: |
+          docker run -d --name smoke -p 18000:8000 smoke-test:amd64
+          # wait for /health to respond
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:18000/health >/dev/null 2>&1; then
+              echo "✓ /health up after ${i}s"; break
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:18000/health
+          # actual render — this is what catches missing tex packages
+          status=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
+            -X POST http://localhost:18000/render \
+            -H "Content-Type: application/json" \
+            -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
+          echo "render HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "--- backend logs ---"
+            docker logs smoke
+            echo "--- response ---"
+            cat /tmp/out.pdf
+            exit 1
+          fi
+          head -c 4 /tmp/out.pdf | grep -q '%PDF' || {
+            echo "Response is not a PDF"; head -c 200 /tmp/out.pdf; exit 1;
+          }
+          echo "✓ render produced $(stat -c%s /tmp/out.pdf) bytes of PDF"
+          docker stop smoke
+
+      # 2. After smoke-test passes, build multi-arch and push to GHCR.
       - uses: docker/build-push-action@v6
         with:
           context: ./backend

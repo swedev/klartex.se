@@ -6,16 +6,21 @@ Den definitionen kommer från `../projects/klartex/wysiwyg.md`. Detta dokument b
 
 ## Status (2026-05-11)
 
-**Fas 0 klar.** Stacken är live:
+**Fas 0 klar.** **Fas 1 backend skelett klar.** Stacken är live:
 
 | Endpoint | Servar | Status |
 |----------|--------|--------|
 | `https://klartex.se` | Repots `index.html` (landningssidan) | ✅ |
 | `https://www.klartex.se` | 301 → apex | ✅ |
-| `https://app.klartex.se` | Vite-build (kommer i fas 1) | ⏳ 404 |
-| `https://api.klartex.se/templates` | klartex `serve` mot GHCR-imagen | ✅ |
+| `https://app.klartex.se` | Vite-build (kommer senare i fas 1) | ⏳ 404 |
+| `https://api.klartex.se/health` | `klartex_se` backend status | ✅ |
+| `https://api.klartex.se/templates` | Mall-discovery (passthrough klartex library) | ✅ |
+| `https://api.klartex.se/blocks` | Block-discovery | ✅ |
+| `https://api.klartex.se/render` | JSON in, PDF out | ✅ |
 
-Infrastruktur i `infra/` + `deploy/`; runbook i [`infra/README.md`](infra/README.md).
+**Arkitekturskifte 2026-05-11:** HTTP-yta flyttad från kärnan (`klartex serve` borttagen i `v0.11.0`) till `backend/` i detta repo — FastAPI som importerar `klartex` som library. Image: `ghcr.io/swedev/klartex-se-backend`.
+
+Infrastruktur i `infra/` + `deploy/`; backend i `backend/`; runbook i [`infra/README.md`](infra/README.md) + [`backend/README.md`](backend/README.md).
 
 ## Vad MVP:n *inte* är
 
@@ -172,6 +177,16 @@ Tidigare utkast nämnde Fly.io. Skälen att gå Hetzner istället:
 - **Skalningsbehov saknas.** En `cax11` räcker långt på MVP-volymer.
 
 Tradeoff: vi sköter OS-uppdateringar och backups själva (`unattended-upgrades` aktiverat; Hetzner snapshots manuellt tills behov uppstår).
+
+## Lärdomar — backend-image (2026-05-11)
+
+Tre iterationer krävdes för att få TeX Live-imagen att rendera klartex korrekt:
+
+1. **`tabularx` → `tools`.** I TL2026 finns `tabularx` bara som del av `tools`-paketet. Gammal vana från TL ≤2024.
+2. **`xelatex` inte på PATH.** `texlive/texlive`-bas-imagen sätter PATH via `/etc/profile` (login-shell), uvicorn körs non-interactive. Symlink `/usr/local/texlive/*/bin/<arch>` → `/usr/local/texlive-bin` + `ENV PATH=` fixar.
+3. **Cherry-picking är tröttsamt.** `tcolorbox` behöver `tikz` behöver `tikzfill` behöver … Bytte till `collection-latexextra` som täcker alla transitivt + ger plats för framtida block.
+
+Slutsats för framtida bygg: börja brett (`collection-latexextra` + `collection-fontsrecommended` + specifika tools), inte smalt.
 
 ## Risker
 
