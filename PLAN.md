@@ -4,9 +4,9 @@ Mål: en webbapp som klarar **Bob-testet** — en 65-årig styrelseledamot ska k
 
 Den definitionen kommer från `../projects/klartex/wysiwyg.md`. Detta dokument bryter ner den i körbara faser.
 
-## Status (2026-05-11)
+## Status (2026-05-12)
 
-**Fas 0 klar.** **Fas 1 backend skelett klar.** Stacken är live:
+**Fas 0 klar.** **Fas 1 backend feature-komplett.** Stacken är live:
 
 | Endpoint | Servar | Status |
 |----------|--------|--------|
@@ -16,9 +16,12 @@ Den definitionen kommer från `../projects/klartex/wysiwyg.md`. Detta dokument b
 | `https://api.klartex.se/health` | `klartex_se` backend status | ✅ |
 | `https://api.klartex.se/templates` | Mall-discovery (passthrough klartex library) | ✅ |
 | `https://api.klartex.se/blocks` | Block-discovery | ✅ |
-| `https://api.klartex.se/render` | JSON in, PDF out | ✅ |
+| `https://api.klartex.se/render` | JSON in, PDF ut (med `page_template`-namn eller inline-källa) | ✅ |
+| `https://api.klartex.se/page-templates` | Named page-template registry (GET publikt, POST/DELETE admin) | ✅ |
 
 **Arkitekturskifte 2026-05-11:** HTTP-yta flyttad från kärnan (`klartex serve` borttagen i `v0.11.0`) till `backend/` i detta repo — FastAPI som importerar `klartex` som library. Image: `ghcr.io/swedev/klartex-se-backend`.
+
+**Page-template-registry 2026-05-12 (`backend 0.2.1`):** Branding (`.tex.jinja` + assets som logotyper, fonter) laddas upp en gång till `/page-templates/<namn>` med admin-token, lagras persistent i `/srv/klartex/page-templates`, och refereras sedan från `/render` via `page_template: "<namn>"`. Stand-alone-rendering med inline `page_template_source` finns kvar för engångsfall. Microsoft core fonts (Georgia, Arial, Times New Roman) ingår nu i backend-imagen. VKF:s branding ligger i registret som `vkf` och renderar end-to-end mot live-API:t.
 
 Infrastruktur i `infra/` + `deploy/`; backend i `backend/`; runbook i [`infra/README.md`](infra/README.md) + [`backend/README.md`](backend/README.md).
 
@@ -66,9 +69,9 @@ Mål: kärnan körs som API någonstans nåbart, hela domänen levande, smoke-te
 
 Mål: Bevisa hela kedjan — välj mall, fyll formulär, få PDF — innan vi bygger riktig WYSIWYG.
 
+- [x] Backend `/render` live med `klartex==0.11.1`. VKF:s page-template finns i registret som `vkf` och renderar end-to-end.
 - [ ] Sida `/skapa/kallelse` med ett enkelt formulär (vanliga `<input>`, ingen Tiptap än) som motsvarar `block_kallelse.json`-strukturen.
-- [ ] Submit → POST till `klartex serve /render` → PDF nedladdas i webbläsaren.
-- [ ] Hårdkoda VKF:s branding via `page_template_source`-fältet i API-anropet.
+- [ ] Submit → POST till `https://api.klartex.se/render` med `page_template: "vkf"` → PDF nedladdas i webbläsaren.
 - [ ] Felhantering: schema-valideringsfel från API:t måste mappas till begripliga svenska meddelanden.
 
 **Acceptans:** Bob (eller jag som proxy) kan öppna sidan, fylla i en kallelse till årsmöte, ladda ner en PDF som ser ut som en VKF-kallelse.
@@ -109,8 +112,8 @@ Mål: Användare som inte är VKF kan sätta upp sin egen branding utan att skri
 
 - [ ] Sida `/branding` med formulär: ladda upp logotyp (PNG/SVG → konverteras till PDF via klartex), välj primär- och sekundärfärg, fyll i organisationsnamn och adress.
 - [ ] Förhandsgranskning mot en testmall (samma som CLI-flödet kan göra idag).
-- [ ] Sparad branding blir ett page-template-fragment som webappen passar in i `page_template_source` på alla anrop framöver.
-- [ ] Lagring: enklast i webbläsarens `localStorage` initialt — **eller** koppla till konto om fas 5 sker först.
+- [ ] Sparad branding laddas upp via `POST /page-templates/<namn>` (registret finns redan, se status ovan) och refereras sen i `/render` med `page_template: "<namn>"`. Branding-vyn genererar `.tex.jinja` + assets från formulärfälten — den skriver inte LaTeX för hand.
+- [ ] Lagring: page-template-registret på servern är källan. Lokal `localStorage`-kopia kan användas för utkast innan första uppladdning.
 
 **Acceptans:** En ny användare kan på 5 minuter ladda upp logotyp, välja färger, och få samma typografi som VKF — fast med sin egen branding.
 
@@ -161,7 +164,8 @@ Frågor som behöver besvaras i detta steg är listade under "TBD" i `../project
 |--------|-----|-----------|
 | **Hosting (API + frontend)** | Hetzner Cloud `cax11` (ARM, nbg1), Ubuntu 24.04, Docker Compose | Egen VM ger XeLaTeX out-of-the-box och billigare än Fly.io. Inte Cloudflare Pages — vi har redan Caddy som kan servera statiska filer. |
 | **Reverse proxy / TLS** | Caddy 2 med automatisk Let's Encrypt | `Caddyfile` i `infra/`. Tre vhosts. |
-| **API-image** | `ghcr.io/swedev/klartex:<version>` (multi-arch) | Pinad version i `infra/.env`, aldrig `:latest` i prod. |
+| **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, `texlive/texlive:latest`-bas + mscorefonts) | Pinad version i `infra/.env`, aldrig `:latest` i prod. CI smoke-testar amd64-bygget innan multi-arch-push. |
+| **Page-template-registry** | Filbaserad (`/srv/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn, admin-token-auth | Live sedan `backend 0.2.1` (2026-05-12). Per-org-auth tas i fas 5. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | (a)-alternativet. Bryts ut till eget repo om scopet växer. |
 | **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp, `api.klartex.se` = klartex serve | DNS hos Loopia, kärnan i Hetzner. |
 | **Frontend-stack** | **Förslag (inte beslutat):** React + Vite + Tiptap + TanStack Query + TailwindCSS | Bestäms vid fas 1-start. Alt: Svelte/SvelteKit. |
