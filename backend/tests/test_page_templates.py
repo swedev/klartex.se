@@ -12,15 +12,15 @@ from fastapi.testclient import TestClient
 from klartex_se.main import app
 from klartex_se import page_templates as pt
 
-ADMIN_TOKEN = "test-token-do-not-use-in-prod"
-AUTH = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+API_TOKEN = "test-token-do-not-use-in-prod"
+AUTH = {"Authorization": f"Bearer {API_TOKEN}"}
 
 
 @pytest.fixture(autouse=True)
 def isolated_registry(tmp_path, monkeypatch):
-    """Each test gets a fresh registry dir + admin token."""
+    """Each test gets a fresh registry dir + api token."""
     monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
-    monkeypatch.setenv("ADMIN_TOKEN", ADMIN_TOKEN)
+    monkeypatch.setenv("API_TOKEN", API_TOKEN)
     yield
 
 
@@ -166,8 +166,8 @@ def test_create_conflict_then_overwrite(client):
     assert r.status_code == 201
 
 
-def test_unconfigured_admin_returns_503(client, monkeypatch):
-    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+def test_unconfigured_token_returns_503(client, monkeypatch):
+    monkeypatch.delenv("API_TOKEN", raising=False)
     r = client.post(
         "/page-templates",
         json={"name": "x", "template": b64("y"), "assets": {}},

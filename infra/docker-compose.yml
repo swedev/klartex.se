@@ -11,7 +11,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      API_TOKEN: ${API_TOKEN}
       PAGE_TEMPLATES_DIR: /data/page-templates
     volumes:
       # Persistent storage for uploaded page-template bundles.

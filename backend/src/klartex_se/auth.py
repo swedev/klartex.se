@@ -1,10 +1,17 @@
-"""Admin-token verification for mutating endpoints.
+"""API-token verification for mutating endpoints.
 
-ADMIN_TOKEN env-var gates POST/DELETE on /page-templates. Public endpoints
-(GET, /render) are not affected.
+`API_TOKEN` env-var gates all write endpoints:
 
-This is a stopgap until real auth + orgs land (fas 5). When that happens,
-this dependency is replaced by a session/JWT check.
+- `POST /render`
+- `POST /page-templates`
+- `DELETE /page-templates/<name>`
+
+Read-only endpoints (`GET /health`, `/templates`, `/blocks`, `/page-templates`,
+`/page-templates/<name>`) stay public — metadata-discovery is harmless.
+
+This is a stopgap until per-user auth lands (Clerk integration on the
+frontend + JWT-validering här). When that arrives, this dependency is
+replaced or supplemented by a session/JWT check.
 """
 
 import os
@@ -13,14 +20,14 @@ import secrets
 from fastapi import Header, HTTPException, status
 
 
-def require_admin(authorization: str | None = Header(default=None)) -> None:
+def require_api_token(authorization: str | None = Header(default=None)) -> None:
     """FastAPI dependency. 401 if missing/wrong; 503 if token not configured."""
-    expected = os.environ.get("ADMIN_TOKEN")
+    expected = os.environ.get("API_TOKEN")
     if not expected:
-        # Server isn't configured for admin operations at all.
+        # Server isn't configured for write operations at all.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin endpoints not configured on this instance",
+            detail="API_TOKEN not configured on this instance",
         )
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
