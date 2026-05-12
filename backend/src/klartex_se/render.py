@@ -16,13 +16,14 @@ structured detail the frontend can present.
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from jsonschema import ValidationError
 from pydantic import BaseModel, Field
 
 from klartex import render as klartex_render
 
+from klartex_se.auth import require_api_token
 from klartex_se.page_templates import (
     PageTemplateNotFound,
     TEMPLATE_FILENAME,
@@ -62,11 +63,12 @@ class RenderRequest(BaseModel):
     responses={
         200: {"content": {"application/pdf": {}}},
         400: {"description": "Schema validation or input failure"},
+        401: {"description": "Missing or invalid API_TOKEN"},
         500: {"description": "xelatex failure"},
     },
 )
-def render(req: RenderRequest) -> Response:
-    """Render a template + data combination to a PDF."""
+def render(req: RenderRequest, _: None = Depends(require_api_token)) -> Response:
+    """Render a template + data combination to a PDF. Requires API_TOKEN."""
     page_template_source: str | None = None
     asset_dir: Path | None = None
     data = req.data

@@ -165,7 +165,8 @@ Frågor som behöver besvaras i detta steg är listade under "TBD" i `../project
 | **Hosting (API + frontend)** | Hetzner Cloud `cax11` (ARM, nbg1), Ubuntu 24.04, Docker Compose | Egen VM ger XeLaTeX out-of-the-box och billigare än Fly.io. Inte Cloudflare Pages — vi har redan Caddy som kan servera statiska filer. |
 | **Reverse proxy / TLS** | Caddy 2 med automatisk Let's Encrypt | `Caddyfile` i `infra/`. Tre vhosts. |
 | **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, `texlive/texlive:latest`-bas + mscorefonts) | Pinad version i `infra/.env`, aldrig `:latest` i prod. CI smoke-testar amd64-bygget innan multi-arch-push. |
-| **Page-template-registry** | Filbaserad (`/srv/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn, admin-token-auth | Live sedan `backend 0.2.1` (2026-05-12). Per-org-auth tas i fas 5. |
+| **Page-template-registry** | Filbaserad (`/srv/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn | Live sedan `backend 0.2.1` (2026-05-12). Auth via `API_TOKEN` (samma token gate:ar `/render` + writes på `/page-templates`, se "API-auth" nedan). Per-user-auth med Clerk planeras. |
+| **API-auth** | Shared `API_TOKEN` bearer på alla write-endpoints (`/render`, `POST/DELETE /page-templates`). Discovery + `/health` publika. | Live sedan `backend 0.3.0` (2026-05-12). Stopgap innan Clerk landar på frontenden + JWT-validering här. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | (a)-alternativet. Bryts ut till eget repo om scopet växer. |
 | **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp, `api.klartex.se` = klartex serve | DNS hos Loopia, kärnan i Hetzner. |
 | **Frontend-stack** | **Förslag (inte beslutat):** React + Vite + Tiptap + TanStack Query + TailwindCSS | Bestäms vid fas 1-start. Alt: Svelte/SvelteKit. |

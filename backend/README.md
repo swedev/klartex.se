@@ -6,16 +6,20 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 
 ## Endpoints
 
-| Metod & path | Vad |
-|--------------|-----|
-| `GET /health` | Liveness — används av Docker healthcheck |
-| `GET /templates` | Lista mallar (block-engine + recipe) |
-| `GET /templates/{name}/schema` | JSON Schema för en mall |
-| `GET /blocks` | Lista block-engine-blocktyper |
-| `GET /blocks/{name}/schema` | JSON Schema för en blocktyp |
-| `POST /render` | JSON in, PDF out |
+| Metod & path | Auth | Vad |
+|--------------|------|-----|
+| `GET /health` | — | Liveness — används av Docker healthcheck |
+| `GET /templates` | — | Lista mallar (block-engine + recipe) |
+| `GET /templates/{name}/schema` | — | JSON Schema för en mall |
+| `GET /blocks` | — | Lista block-engine-blocktyper |
+| `GET /blocks/{name}/schema` | — | JSON Schema för en blocktyp |
+| `GET /page-templates` | — | Lista registrerade page-template-bundles |
+| `GET /page-templates/{name}` | — | Metadata för en bundle |
+| `POST /render` | **API_TOKEN** | JSON in, PDF out |
+| `POST /page-templates` | **API_TOKEN** | Skapa eller ersätt en bundle (base64-JSON) |
+| `DELETE /page-templates/{name}` | **API_TOKEN** | Ta bort en bundle |
 
-Multipart-varianten `/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
+Write-endpoints kräver `Authorization: Bearer $API_TOKEN`. Token sätts via env-var i `infra/.env` på servern (eller lokalt vid utveckling). Stopgap tills per-user auth landar — då migreras detta till Clerk-JWT-validering.
 
 ## Lokal utveckling
 
@@ -27,10 +31,19 @@ pip install -e ".[dev]"
 # Kör servern
 uvicorn klartex_se.main:app --reload --port 8000
 
-# Smoke-test
+# Sätt API_TOKEN för write-endpoints
+export API_TOKEN=$(openssl rand -hex 32)
+
+# Starta servern med token i miljön
+API_TOKEN=$API_TOKEN uvicorn klartex_se.main:app --reload --port 8000
+
+# Smoke-test — discovery är publikt
 curl http://localhost:8000/templates | jq '.[].name'
+
+# /render kräver token
 curl -X POST http://localhost:8000/render \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_TOKEN" \
   -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"Test"}]}}' \
   -o /tmp/test.pdf
 ```

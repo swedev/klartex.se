@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from klartex_se.auth import require_admin
+from klartex_se.auth import require_api_token
 from klartex_se.page_templates import (
     PageTemplateError,
     PageTemplateExists,
@@ -56,8 +56,8 @@ def get(name: str) -> dict:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create(req: CreateBundle, _: None = Depends(require_admin)) -> dict:
-    """Create or replace a page-template bundle. Requires ADMIN_TOKEN."""
+def create(req: CreateBundle, _: None = Depends(require_api_token)) -> dict:
+    """Create or replace a page-template bundle. Requires API_TOKEN."""
     try:
         return save_bundle(
             name=req.name,
@@ -73,8 +73,8 @@ def create(req: CreateBundle, _: None = Depends(require_admin)) -> dict:
 
 
 @router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT)
-def delete(name: str, _: None = Depends(require_admin)) -> None:
-    """Delete a bundle. Requires ADMIN_TOKEN."""
+def delete(name: str, _: None = Depends(require_api_token)) -> None:
+    """Delete a bundle. Requires API_TOKEN."""
     try:
         delete_bundle(name)
     except PageTemplateNotFound as e:
