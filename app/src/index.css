@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Tiptap-editor: prose-aktig typografi inuti .ProseMirror så att rubriker,
+   stycken och listor får synlig hierarki i editorn. Slutgiltig PDF styrs
+   av page_template (vkf:s Georgia-headers), inte av detta. */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror :where(h1) {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0.5rem 0 1rem;
+  line-height: 1.2;
+}
+
+.ProseMirror :where(h2) {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem;
+  line-height: 1.25;
+}
+
+.ProseMirror :where(h3) {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.ProseMirror :where(p) {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.ProseMirror :where(ul, ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror :where(ul) { list-style: disc; }
+.ProseMirror :where(ol) { list-style: decimal; }
+
+.ProseMirror :where(a) {
+  color: var(--accent-11);
+  text-decoration: underline;
+}
