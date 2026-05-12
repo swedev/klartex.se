@@ -65,35 +65,35 @@ Mål: kärnan körs som API någonstans nåbart, hela domänen levande, smoke-te
 - Frontend (Vite + React + Tiptap) — scaffoldas i `app/` när fas 1 börjar.
 - CORS-modell — Caddy har en strikt `Access-Control-Allow-Origin: https://app.klartex.se`; om dev-flödet behöver annat tar vi det då.
 
-### Fas 1 — End-to-end med en mall, ingen editor (2–3 dagar)
+### Fas 1 — Minimal Tiptap end-to-end (1 vecka)
 
-Mål: Bevisa hela kedjan — välj mall, fyll formulär, få PDF — innan vi bygger riktig WYSIWYG.
+Mål: Bevisa hela kedjan — Tiptap-editor → klartex-JSON → PDF — med minsta möjliga block-set. Inget kasserat formulär-mellansteg.
 
 - [x] Backend `/render` live med `klartex==0.11.1`. VKF:s page-template finns i registret som `vkf` och renderar end-to-end.
-- [ ] Sida `/skapa/kallelse` med ett enkelt formulär (vanliga `<input>`, ingen Tiptap än) som motsvarar `block_kallelse.json`-strukturen.
+- [ ] Frontend-scaffold i `app/` enligt referensstacken (`~/repos/openvera`), deployad till `app.klartex.se`.
+- [ ] Tiptap monterad med basblock: `heading`, `paragraph` (med inline-formatering: fet, kursiv, länk), `bulletList`, `orderedList`. Inga custom-block än.
+- [ ] Serialisering: Tiptap-state → klartex-JSON för basblock-setet. Inline-markup mappar mot kärnans `inline_markup.py`.
 - [ ] Submit → POST till `https://api.klartex.se/render` med `page_template: "vkf"` → PDF nedladdas i webbläsaren.
-- [ ] Felhantering: schema-valideringsfel från API:t måste mappas till begripliga svenska meddelanden.
+- [ ] Felhantering: schema-valideringsfel från API:t mappas till begripliga svenska meddelanden.
 
-**Acceptans:** Bob (eller jag som proxy) kan öppna sidan, fylla i en kallelse till årsmöte, ladda ner en PDF som ser ut som en VKF-kallelse.
+**Acceptans:** Du kan öppna `app.klartex.se`, skriva en rubrik + några stycken + en punktlista i editorn, klicka "Ladda ner PDF" och få tillbaka en VKF-formaterad PDF (Georgia-rubriker, rätt marginaler). Ingen mallväljare, ingen sidopanel, inga klartex-specifika block — bara grundfundamentet.
 
-Detta är **den minsta möjliga MVP:n**. Allt nedan är "bättre MVP".
+Detta är den minsta Tiptap-baserade MVP:n. Allt nedan utökar block-täckning, mall-val och persistens.
 
-### Fas 2 — Tiptap-editor mot block engine (1–2 veckor)
+### Fas 2 — Custom block-typer (1–2 veckor)
 
-Mål: Ersätt formuläret med rik texteditor + "+"-meny för block.
+Mål: Utöka från "fritt skrivande" till klartex-specifika block med eget JSON-schema.
 
-- [ ] Mappa Tiptap-noder till klartex-block:
-  - `heading` (Tiptap Heading)
-  - `text` / paragraph (Tiptap Paragraph + inline-formatering)
-  - `list` (Tiptap BulletList/OrderedList)
-  - `signatures`, `agenda`, `description_list`, `clause` (custom Tiptap-noder med eget formulär per block)
-  - Resterande block (`table`, `callout`, `quote`, `parties`, `name_roster`, `columns`, `page_break`, `latex` etc.) — ta i prio-ordning utifrån vad VKF-flödet faktiskt använder.
+- [ ] Custom Tiptap-noder för klartex-block i priordning utifrån VKF-flödet:
+  - `signatures` — enklast, finns i nästan alla dokumenttyper.
+  - `agenda` — bevis-of-concept för block med egen JSON-struktur och rad-redigering.
+  - `description_list`, `clause` — formulär per block.
+  - Resten (`table`, `callout`, `quote`, `parties`, `name_roster`, `columns`, `page_break`, `latex` etc.) tas i prio efter VKF-användning.
 - [ ] Block-formulär autogenereras från `/templates/_block/schema`. Fältlabels, typer, required, descriptions från schemat — ingen hårdkodning per block.
-- [ ] Serialisering: Tiptap-state → klartex-JSON. Skriv testsvit i fas 2 som verifierar rundresa-förlustfrihet mot fixtures i `../klartex/tests/fixtures/block_*.json`.
-- [ ] Inline-markup (fet, kursiv, länkar) måste matcha kärnans `inline_markup.py` — annars går rundresan sönder.
 - [ ] "+"-meny för att infoga block. Drag-and-drop för att flytta. Delete för att ta bort.
+- [ ] Rundresa-testsvit: Tiptap-state → klartex-JSON → Tiptap-state ska vara förlustfri mot fixtures i `../klartex/tests/fixtures/block_*.json`. Krav, inte nice-to-have.
 
-**Acceptans:** Användaren skriver brödtext fritt, infogar `agenda` via "+"-meny, fyller i formuläret för det blocket, ser blocket i editorn (med rimlig preview, inte slutgiltig PDF), klickar "Ladda ner PDF" och får tillbaka samma typografi som CLI-flödet.
+**Acceptans:** Användaren skriver brödtext fritt, infogar `agenda` via "+"-meny, fyller i formuläret för det blocket, ser blocket i editorn (rimlig preview, inte slutgiltig PDF), klickar "Ladda ner PDF" och får tillbaka samma typografi som CLI-flödet.
 
 ### Fas 3 — Mallväljare + sidopanel (3–5 dagar)
 
@@ -147,7 +147,7 @@ Frågor som behöver besvaras i detta steg är listade under "TBD" i `../project
 | Fas | Insats | Kalender (1 person, deltid) |
 |-----|--------|----------------------------|
 | 0 | 1–2 dagar | Vecka 1 |
-| 1 | 2–3 dagar | Vecka 1 |
+| 1 | 1 vecka | Vecka 1 |
 | 2 | 1–2 veckor | Vecka 2–4 |
 | 3 | 3–5 dagar | Vecka 5 |
 | 4 | 1 vecka | Vecka 6 |
@@ -216,7 +216,7 @@ Allt nedan måste vara sant innan vi annonserar publikt:
 
 ## Nästa steg
 
-1. **Bekräfta frontend-stacken** (React + Vite + Tiptap + TailwindCSS) — sista oöppna beslutet innan fas 1.
-2. **Öppna issue `MVP fas 1 — kallelse-formulär end-to-end`** i `swedev/klartex.se`-repot.
-3. **Scaffolda `app/`** med Vite + React, deploya första statiska build till `app.klartex.se`.
-4. **Implementera kallelse-formulär** som POST:ar till `https://api.klartex.se/render` och triggar PDF-nedladdning.
+1. **Konkretisera frontend-stacken** mot `~/repos/openvera` som referens — formalisera valet (React + Vite + Tiptap + …) innan scaffold.
+2. **Öppna issue `MVP fas 1 — minimal Tiptap end-to-end`** i `swedev/klartex.se`-repot.
+3. **Scaffolda `app/`** enligt stacken, deploya första statiska build till `app.klartex.se`.
+4. **Implementera Tiptap-editor** med basblock (heading, paragraph, bulletList, orderedList + inline-formatering) som serialiserar till klartex-JSON och POST:ar till `https://api.klartex.se/render` med `page_template: "vkf"`.
