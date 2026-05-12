@@ -8,6 +8,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-pip python3-venv curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Microsoft core fonts (Georgia, Arial, Times New Roman, …) — common in
+# user-supplied page templates. EULA accepted via debconf so install is
+# non-interactive. fc-cache registers them so fontspec finds them at
+# render time. Bundle authors can still ship their own .ttf as an asset.
+RUN . /etc/os-release \
+    && echo "deb http://deb.debian.org/debian $VERSION_CODENAME contrib" \
+        > /etc/apt/sources.list.d/contrib.list \
+    && apt-get update \
+    && echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true \
+        | debconf-set-selections \
+    && apt-get install -y --no-install-recommends \
+        ttf-mscorefonts-installer fontconfig \
+    && fc-cache -f \
+    && rm -rf /var/lib/apt/lists/*
+
 # texlive/texlive sets PATH via /etc/profile (login shell). uvicorn runs
 # non-interactive, so symlink the arch-specific bin dir to a stable path
 # and add it to ENV PATH.
