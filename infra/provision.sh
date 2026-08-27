@@ -14,9 +14,9 @@ SERVER_NAME="${SERVER_NAME:-klartex-api-1}"
 SERVER_TYPE="${SERVER_TYPE:-cax11}"        # ARM, 2 vCPU, 4GB, ~€3.79/mån
 LOCATION="${LOCATION:-hel1}"               # Helsinki — lowest latency from SE
 IMAGE="${IMAGE:-ubuntu-24.04}"
-SSH_KEY_NAME="${SSH_KEY_NAME:-matte-macbookPro}"
+SSH_KEY_NAME="${SSH_KEY_NAME:-matte}"
 FIREWALL_NAME="${FIREWALL_NAME:-klartex-public}"
-SSH_PUBKEY_FILE="${SSH_PUBKEY_FILE:-$HOME/.ssh/id_ed25519.pub}"
+SSH_PUBKEY_FILE="${SSH_PUBKEY_FILE:-$HOME/.ssh/id_ed25519_sk.pub}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLOUD_INIT_SRC="$SCRIPT_DIR/cloud-init.yaml"
