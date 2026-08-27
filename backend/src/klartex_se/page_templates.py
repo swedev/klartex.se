@@ -25,10 +25,11 @@ behave differently inside the .tex.jinja:
   directory only, with no cwd fallback.
 
 When a name exists both in the bundle and in the process cwd, the
-bundle's copy wins. Parent-relative references (`../shared.tex`) are out
-of contract: asset filenames carry no path separators, so no bundle can
-create that layout through the API, and such a reference would reach a
-sibling bundle.
+bundle's copy wins. Parent-relative references are out of contract:
+asset filenames carry no path separators, so no bundle can create that
+layout through the API, and such a reference escapes the bundle —
+`../shared.tex` lands in the registry root, `../other/logo.pdf` in
+another bundle.
 
 Forward-compat note: once orgs+auth land (fas 5), this layout migrates to
 /data/orgs/<org>/page-templates/<name>/. The same internal API stays.
