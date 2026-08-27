@@ -9,3 +9,6 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# Web app
+app/dist/
+app/node_modules/
