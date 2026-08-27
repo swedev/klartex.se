@@ -13,13 +13,19 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 | `GET /templates/{name}/schema` | JSON Schema för en mall |
 | `GET /blocks` | Lista block-engine-blocktyper |
 | `GET /blocks/{name}/schema` | JSON Schema för en blocktyp |
-| `POST /render` | JSON in, PDF out |
+| `POST /render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 |
 | `GET /page-templates` | Lista registrerade sidmalls-bundles |
 | `GET /page-templates/{name}` | Metadata för en bundle |
 | `POST /page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) — kräver `ADMIN_TOKEN` |
 | `DELETE /page-templates/{name}` | Ta bort en bundle — kräver `ADMIN_TOKEN` |
 
 Multipart-varianten `/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
+
+## Belastningstak på `/render`
+
+En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Endpointen tar därför en av två render-platser innan arbetet börjar. Är båda upptagna svaras `503` direkt — med `Retry-After: 5` och `detail.type = "overloaded"` — i stället för att köa.
+
+Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Edge-lagret kompletterar med rate limit och body-gräns på `POST /render` (se `infra/Caddyfile`), och containern har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
 
 ## Assets i registrerade sidmallar
 
@@ -50,7 +56,7 @@ curl -X POST http://localhost:8000/render \
   -o /tmp/test.pdf
 ```
 
-Tester (`xelatex` behövs för render-tester):
+Tester (`xelatex` behövs för render-tester; de hoppas över när det saknas, och samma pytest-svit körs i CI före image-bygget):
 
 ```bash
 pytest
@@ -68,4 +74,4 @@ docker run --rm -p 8000:8000 klartex-se-backend:dev
 
 Bygg + push sker via `.github/workflows/backend.yml` på varje merge till `main` som rör `backend/`. Bygger multi-arch (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`.
 
-För produktion: bumpa `version` i `pyproject.toml`, merga, vänta på workflow, uppdatera `KLARTEX_SE_BACKEND_VERSION` i `infra/.env`, kör `./deploy/deploy.sh`.
+För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, vänta på workflow, uppdatera `BACKEND_VERSION` i `infra/.env`, kör `./deploy/deploy.sh`.

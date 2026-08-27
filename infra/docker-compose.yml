@@ -7,6 +7,14 @@ services:
     image: ghcr.io/swedev/klartex-se-backend:${BACKEND_VERSION}
     container_name: klartex-se-backend
     restart: unless-stopped
+    # Resource caps for the render workload. The host is a cax11
+    # (2 vCPU, 4 GB), so OS + Caddy keep ~1.5 GB and half a core.
+    # memswap_limit == mem_limit disables swap: a render that blows the
+    # cap is OOM-killed rather than thrashing the disk.
+    cpus: "1.5"
+    mem_limit: 2560m
+    memswap_limit: 2560m
+    pids_limit: 256
     # Bind to loopback only — Caddy is the public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
@@ -25,7 +33,10 @@ services:
       start_period: 20s
 
   caddy:
-    image: caddy:2-alpine
+    # Built on the server: rate limiting needs a third-party module that
+    # the official image does not carry. Never pushed to a registry.
+    build: ./caddy
+    image: klartex-se-caddy:local
     container_name: caddy
     restart: unless-stopped
     ports:

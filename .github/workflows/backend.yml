@@ -22,6 +22,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Unit tests run before anything is built or pushed. xelatex is not
+      # installed on the runner, so the render tests that need it skip
+      # themselves; the concurrency-cap tests run everywhere.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+          pytest -q
+
       - name: Read version from pyproject.toml
         id: meta
         run: |
