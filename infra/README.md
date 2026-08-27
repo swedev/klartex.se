@@ -12,7 +12,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 | `Caddyfile` | TLS + tre vhosts: `klartex.se`, `app.klartex.se`, `api.klartex.se`. Rate limit + body-gräns på `POST /render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
 | `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION`. |
-| `../deploy/deploy.sh` | Pushar compose + Caddyfile + statiska filer till servern och reloadar. |
+| `../.github/workflows/deploy.yml` | Deployar vid en `v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, restartar. |
 
 ## Från noll till live
 
@@ -25,33 +25,38 @@ Förutsätter att `hcloud` CLI är autentiserad och SSH-nyckeln uppladdad (se kl
 # 2. Vänta ~2 min, peka DNS mot returnerad IP
 #    klartex.se / www / app / api  →  A-record
 
-# 3. Konfigurera env-pinningen
-cp infra/.env.example infra/.env
-$EDITOR infra/.env        # bumpa BACKEND_VERSION om så önskas
+# 3. Lägg env-filen på servern. Den görs en gång för hand och versionshanteras
+#    aldrig — den bär ADMIN_TOKEN. Deployen läser den, men rör aldrig annat än
+#    BACKEND_VERSION-raden.
+scp infra/.env.example klartex@<ip>:/srv/klartex/.env
+ssh -t klartex@<ip> "nano /srv/klartex/.env"
 
-# 4. Första deploy
-./deploy/deploy.sh
+# 4. Första deploy: tagga en version vars image finns i GHCR
+git tag v0.2.3 && git push origin v0.2.3
 ```
 
 ## Uppgradera backend-versionen
 
-1. Bumpa `BACKEND_VERSION` i `infra/.env`.
-2. `./deploy/deploy.sh` — pullar ny image, restartar via systemd.
-3. Verifiera: `curl -fsS https://api.klartex.se/templates | jq '.[].name'`.
+1. Bumpa `version` i `backend/pyproject.toml` och `__version__` i `backend/src/klartex_se/__init__.py`.
+2. Merga till `main` och vänta på `backend.yml`, som bygger och pushar imagen till GHCR.
+3. Tagga samma version och pusha taggen: `git tag v0.2.4 && git push origin v0.2.4`.
+4. Verifiera: `curl -fsS https://api.klartex.se/health`.
 
-Rollback: ändra `BACKEND_VERSION` tillbaka och kör `deploy.sh` igen. Eftersom alla version-taggar är pushade till GHCR finns alla versioner kvar att pulla.
+Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/health` rapporterar då skulle säga olika saker.
+
+Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version och deployar den imagen. Alla version-taggar ligger kvar i GHCR.
 
 ## Caddy byggs på servern
 
 Rate limit är inte en del av Caddy — `mholt/caddy-ratelimit` är en tredjepartsmodul som kräver en egen binär. `caddy/Dockerfile` bygger den med `xcaddy`; compose-tjänsten `caddy` har `build: ./caddy` och taggen `klartex-se-caddy:local`, som aldrig pushas till något registry. Bygget sker på servern så att arkitekturen (ARM) blir rätt utan att en image behöver versioneras i CI.
 
-Både Caddy-versionen och modul-committen är pinnade i `caddy/Dockerfile`. Uppgradering: ändra båda `FROM caddy:<version>`-raderna till samma nya version, sätt `RATELIMIT_VERSION` till en ny tagg eller commit, och kör `deploy.sh`.
+Både Caddy-versionen och modul-committen är pinnade i `caddy/Dockerfile`. Uppgradering: ändra båda `FROM caddy:<version>`-raderna till samma nya version, sätt `RATELIMIT_VERSION` till en ny tagg eller commit, och deploya med en ny version-tagg.
 
 Serverkrav för bygget: utgående åtkomst till Docker Hub, GitHub och Go-modulproxyn, plus disk och RAM för Go-kompileringen (någon minut första gången; Docker cachear tills `caddy/Dockerfile` ändras).
 
-`deploy.sh` bygger imagen och kör preflight — `caddy list-modules` (modulen finns i binären) och `caddy validate` (Caddyfilen parsar) — innan den körande stacken stoppas. Konfigen som ligger på servern säkerhetskopieras till `/srv/klartex-deploy-backup/` före rsyncen och återställs automatiskt om bygget, preflighten eller omstarten fallerar; `klartex-se-caddy:local` pekas då tillbaka på imagen som körde. Fallerar något före omstarten rörs den körande stacken inte alls.
+Deploy-workflowen bygger imagen och kör preflight — `caddy list-modules` (modulen finns i binären) och `caddy validate` (Caddyfilen parsar) — innan den körande stacken stoppas. Konfigen som ligger på servern säkerhetskopieras till `/srv/klartex-deploy-backup/` före rsyncen och återställs automatiskt om bygget, preflighten eller omstarten fallerar; `klartex-se-caddy:local` pekas då tillbaka på imagen som körde. Fallerar något före omstarten rörs den körande stacken inte alls.
 
-Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka `image: caddy:2-alpine` i `docker-compose.yml` tillsammans med föregående Caddyfile, och kör `deploy.sh` igen. Certifikaten ligger i `./caddy-data` och påverkas inte.
+Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka `image: caddy:2-alpine` i `docker-compose.yml` tillsammans med föregående Caddyfile, och deploya om. Certifikaten ligger i `./caddy-data` och påverkas inte.
 
 ## Rate limit och storleksgräns på `/render`
 
@@ -64,7 +69,7 @@ Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), o
 Imagen `ghcr.io/swedev/klartex` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
 https://github.com/orgs/swedev/packages/container/klartex/settings
 
-Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i `infra/.env`, lägg till `docker login ghcr.io` i `deploy.sh` innan `pull`.
+Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i serverns `/srv/klartex/.env`, och lägg till `docker login ghcr.io` i deploy-workflowens remote-block innan `pull`.
 
 ## Säkerhet
 
@@ -94,6 +99,6 @@ ssh klartex@<ip> "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
 ## Saker som *inte* finns här (medvetet)
 
 - **Databas.** Tillkommer i MVP fas 5 (konton/persistens).
-- **Frontend-build i CI.** Görs lokalt eller i en framtida workflow; `deploy.sh` rsync:ar bara `app/dist/`.
+- **Frontend-build och -deploy.** `app/dist` har ingen källkod i repot, så deploy-workflowen rör inte `/srv/app`. Tillkommer med frontend-källan (#14).
 - **Monitoring/alerting.** Hetzners egna metrics räcker tills appen lever på riktigt.
 - **Backups bortom Hetzner snapshots.** Aktivera "automatic backups" på servern (+20%) när data finns.

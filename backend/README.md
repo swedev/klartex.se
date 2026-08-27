@@ -74,4 +74,4 @@ docker run --rm -p 8000:8000 klartex-se-backend:dev
 
 Bygg + push sker via `.github/workflows/backend.yml` på varje merge till `main` som rör `backend/`. Bygger multi-arch (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`.
 
-För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, vänta på workflow, uppdatera `BACKEND_VERSION` i `infra/.env`, kör `./deploy/deploy.sh`.
+För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, vänta på workflow, och pusha en matchande `v*`-tagg — den deployar via `.github/workflows/deploy.yml`.
