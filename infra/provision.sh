@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # --- Config -----------------------------------------------------------------
-SERVER_NAME="${SERVER_NAME:-klartex-api-1}"
+SERVER_NAME="${SERVER_NAME:-klartex-1}"
 SERVER_TYPE="${SERVER_TYPE:-cax11}"        # ARM, 2 vCPU, 4GB, ~€3.79/mån
 LOCATION="${LOCATION:-hel1}"               # Helsinki — lowest latency from SE
 IMAGE="${IMAGE:-ubuntu-24.04}"
