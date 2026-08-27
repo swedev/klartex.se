@@ -25,8 +25,25 @@ echo "→ deploying to $SSH_USER@$HOST"
 [[ -f "$REPO_ROOT/infra/.env" ]] || { echo "infra/.env not found — copy from .env.example first"; exit 1; }
 
 # Ensure persistent dirs exist on the server (cloud-init only runs once,
-# so we don't rely on it for dirs added after initial provisioning).
-$SSH "sudo mkdir -p /srv/klartex/page-templates && sudo chown -R klartex:klartex /srv/klartex/page-templates"
+# so we don't rely on it for dirs added after initial provisioning), and
+# back up the running config before rsync overwrites it. The backup lives
+# outside /srv/klartex because the rsync below runs with --delete and would
+# wipe a backup directory that has no local counterpart.
+$SSH bash -se <<'REMOTE'
+set -Eeuo pipefail
+sudo mkdir -p /srv/klartex/page-templates /srv/klartex-deploy-backup
+sudo chown -R klartex:klartex /srv/klartex/page-templates /srv/klartex-deploy-backup
+rm -rf /srv/klartex-deploy-backup/*
+for f in docker-compose.yml Caddyfile .env; do
+    if [[ -f "/srv/klartex/$f" ]]; then
+        cp "/srv/klartex/$f" /srv/klartex-deploy-backup/
+    fi
+done
+if [[ -d /srv/klartex/caddy ]]; then
+    cp -r /srv/klartex/caddy /srv/klartex-deploy-backup/
+fi
+echo "  backed up running config to /srv/klartex-deploy-backup"
+REMOTE
 
 rsync -av --delete \
     --exclude=caddy-data --exclude=caddy-config --exclude=page-templates \
@@ -44,14 +61,54 @@ else
     echo "  (no app/dist — skipping frontend push)"
 fi
 
-# --- Pull new image and reload ----------------------------------------------
+# --- Build, preflight, pull and reload --------------------------------------
 $SSH bash -se <<'REMOTE'
-set -euo pipefail
+set -Eeuo pipefail
 cd /srv/klartex
-docker compose pull
+
+restore() {
+    trap - ERR
+    echo "✗ deploy failed — restoring config from /srv/klartex-deploy-backup"
+    cp /srv/klartex-deploy-backup/docker-compose.yml \
+       /srv/klartex-deploy-backup/Caddyfile \
+       /srv/klartex-deploy-backup/.env /srv/klartex/
+    rm -rf /srv/klartex/caddy
+    if [[ -d /srv/klartex-deploy-backup/caddy ]]; then
+        cp -r /srv/klartex-deploy-backup/caddy /srv/klartex/
+    fi
+    sudo systemctl restart klartex-stack.service
+    exit 1
+}
+trap restore ERR
+
+# The caddy image is built here, not pulled: `docker compose pull` alone
+# would try to fetch klartex-se-caddy:local from a registry.
+if docker compose pull --help | grep -q -- --ignore-buildable; then
+    docker compose pull --ignore-buildable
+else
+    docker compose pull backend
+fi
+
+# The systemd unit runs `docker compose up -d`, which does not rebuild on a
+# changed Dockerfile — build explicitly.
+docker compose build --pull caddy
+
+# Preflight the new binary and config before the running stack is stopped.
+docker compose run --rm --no-deps caddy caddy list-modules | grep -q 'http\.handlers\.rate_limit'
+docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
 sudo systemctl restart klartex-stack.service
-sleep 3
+sleep 5
 docker compose ps
+running="$(docker compose ps --services --filter status=running)"
+for svc in backend caddy; do
+    grep -qx "$svc" <<<"$running" || {
+        echo "service $svc is not running after restart"
+        false
+    }
+done
+
+trap - ERR
 REMOTE
 
 echo "✓ deploy complete"

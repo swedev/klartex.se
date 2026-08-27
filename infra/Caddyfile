@@ -55,10 +55,43 @@ api.klartex.se {
         Vary                        "Origin"
         Strict-Transport-Security   "max-age=31536000; includeSubDomains"
     }
+
+    @render {
+        method POST
+        path /render
+    }
+
+    # Cap the render body before FastAPI parses it: the backend reads and
+    # validates the whole JSON body before its concurrency semaphore is
+    # reached. Caddy cuts the body off at the limit and answers 413.
+    # /page-templates uploads carry fonts and are deliberately excluded.
+    request_body @render {
+        max_size 2MB
+    }
+
+    # Coarse per-IP cap on renders. Caddy has no trusted_proxies here, so
+    # {client_ip} is the real peer address and X-Forwarded-For cannot
+    # bypass it. IPv6 is bucketed per /64 so address rotation inside one
+    # prefix shares a bucket. Other endpoints stay unlimited.
+    rate_limit {
+        zone render_per_ip {
+            match {
+                method POST
+                path /render
+            }
+            key         {client_ip}
+            events      10
+            window      1m
+            ipv6_prefix 64
+        }
+    }
+
     reverse_proxy backend:8000 {
-        # PDF responses can be a few MB; keep timeouts generous.
+        # PDF responses can be a few MB; keep timeouts generous. A render
+        # is two xelatex runs of up to 60s each, so the proxy must wait
+        # longer than the worst legitimate case.
         transport http {
-            response_header_timeout 60s
+            response_header_timeout 150s
         }
     }
 }

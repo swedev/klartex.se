@@ -2,10 +2,12 @@
 
 import base64
 import shutil
+import threading
 
 import pytest
 from fastapi.testclient import TestClient
 
+from klartex_se import render as render_module
 from klartex_se.main import app
 
 client = TestClient(app)
@@ -119,3 +121,113 @@ def test_render_builtin_page_template_passes_through(tmp_path, monkeypatch):
     if r.status_code == 400:
         # If we ever get here, the built-in passthrough broke.
         assert r.json()["detail"]["type"] != "unknown_page_template"
+
+
+# --- Concurrency cap -------------------------------------------------------
+#
+# The tests below never invoke xelatex: klartex_render is replaced by a fake,
+# so they exercise the semaphore alone and run anywhere.
+
+MINIMAL_BODY = {
+    "template": "_block",
+    "data": {"body": [{"type": "heading", "text": "x"}]},
+}
+
+
+@pytest.fixture
+def render_slots(monkeypatch):
+    """Give each test its own semaphore, so a failure cannot leak slots."""
+    slots = threading.BoundedSemaphore(render_module.MAX_CONCURRENT_RENDERS)
+    monkeypatch.setattr(render_module, "_render_slots", slots)
+    return slots
+
+
+def assert_all_slots_free(slots):
+    """Every slot is free — and no more than MAX_CONCURRENT_RENDERS exist."""
+    acquired = [
+        slots.acquire(blocking=False)
+        for _ in range(render_module.MAX_CONCURRENT_RENDERS)
+    ]
+    extra = slots.acquire(blocking=False)
+    for ok in acquired:
+        if ok:
+            slots.release()
+    if extra:
+        slots.release()
+    assert all(acquired), "a render slot leaked"
+    assert not extra, "more slots than MAX_CONCURRENT_RENDERS"
+
+
+def test_render_returns_503_when_all_slots_taken(render_slots):
+    for _ in range(render_module.MAX_CONCURRENT_RENDERS):
+        assert render_slots.acquire(blocking=False)
+
+    r = client.post("/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 503
+    assert r.headers["Retry-After"] == "5"
+    assert r.json()["detail"]["type"] == "overloaded"
+
+
+def test_render_releases_slot_after_success(render_slots, monkeypatch):
+    monkeypatch.setattr(
+        render_module, "klartex_render", lambda *a, **kw: b"%PDF-fake"
+    )
+
+    r = client.post("/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 200
+    assert_all_slots_free(render_slots)
+
+
+def test_render_releases_slot_after_failure(render_slots, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("xelatex exploded")
+
+    monkeypatch.setattr(render_module, "klartex_render", boom)
+
+    r = client.post("/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 500
+    assert r.json()["detail"]["type"] == "render_error"
+    assert_all_slots_free(render_slots)
+
+
+def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
+    """Two renders occupy both slots; a third is rejected immediately."""
+    in_render = threading.Semaphore(0)
+    release = threading.Event()
+
+    def blocking_render(*args, **kwargs):
+        in_render.release()
+        assert release.wait(timeout=10), "render fake was never released"
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(render_module, "klartex_render", blocking_render)
+
+    results: dict[int, int] = {}
+
+    def run(index):
+        results[index] = client.post("/render", json=MINIMAL_BODY).status_code
+
+    threads = [
+        threading.Thread(target=run, args=(i, ), daemon=True)
+        for i in range(render_module.MAX_CONCURRENT_RENDERS)
+    ]
+    for t in threads:
+        t.start()
+    try:
+        for _ in threads:
+            assert in_render.acquire(timeout=10), "renders never started"
+
+        r = client.post("/render", json=MINIMAL_BODY)
+        assert r.status_code == 503
+        assert r.json()["detail"]["type"] == "overloaded"
+    finally:
+        release.set()
+        for t in threads:
+            t.join(timeout=10)
+
+    assert not any(t.is_alive() for t in threads)
+    assert sorted(results.values()) == [200] * len(threads)
+    assert_all_slots_free(render_slots)

@@ -14,6 +14,7 @@ structured detail the frontend can present.
 """
 
 import logging
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -36,6 +37,14 @@ router = APIRouter(tags=["render"])
 # klartex built-in page-template names. Passed through as data["page_template"];
 # bundle lookup is skipped for these.
 BUILTIN_PAGE_TEMPLATES = {"formal", "clean", "none"}
+
+# Cap on concurrent xelatex runs. FastAPI dispatches sync endpoints to a
+# thread pool of ~40 threads, so without a cap that many xelatex processes
+# can start at once. The value assumes a single uvicorn worker per
+# container: additional workers or replicas multiply the effective cap.
+MAX_CONCURRENT_RENDERS = 2
+
+_render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
 
 
 class RenderRequest(BaseModel):
@@ -63,6 +72,7 @@ class RenderRequest(BaseModel):
         200: {"content": {"application/pdf": {}}},
         400: {"description": "Schema validation or input failure"},
         500: {"description": "xelatex failure"},
+        503: {"description": "Too many concurrent renders"},
     },
 )
 def render(req: RenderRequest) -> Response:
@@ -92,6 +102,18 @@ def render(req: RenderRequest) -> Response:
             page_template_source = (bundle_dir / TEMPLATE_FILENAME).read_text()
             asset_dir = bundle_dir
 
+    if not _render_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "type": "overloaded",
+                "message": (
+                    "Too many concurrent renders. Retry in a few seconds."
+                ),
+            },
+            headers={"Retry-After": "5"},
+        )
+
     try:
         pdf_bytes = klartex_render(
             req.template,
@@ -119,6 +141,8 @@ def render(req: RenderRequest) -> Response:
             status_code=500,
             detail={"type": "render_error", "message": str(e)},
         ) from e
+    finally:
+        _render_slots.release()
 
     return Response(
         content=pdf_bytes,
