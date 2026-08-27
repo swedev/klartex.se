@@ -14,8 +14,23 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 | `GET /blocks` | Lista block-engine-blocktyper |
 | `GET /blocks/{name}/schema` | JSON Schema för en blocktyp |
 | `POST /render` | JSON in, PDF out |
+| `GET /page-templates` | Lista registrerade sidmalls-bundles |
+| `GET /page-templates/{name}` | Metadata för en bundle |
+| `POST /page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) — kräver `ADMIN_TOKEN` |
+| `DELETE /page-templates/{name}` | Ta bort en bundle — kräver `ADMIN_TOKEN` |
 
 Multipart-varianten `/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
+
+## Assets i registrerade sidmallar
+
+En sidmall registrerad via `/page-templates` sparas som en bundle: `page_template.tex.jinja` plus dess assets i samma katalog. Vid `/render` pekas klartex på bundle-katalogen, som blir både sökväg för `TEXINPUTS` och arbetskatalog för xelatex. Det ger två referensformer i mallen:
+
+| Referens i mallen | Löses mot |
+|-------------------|-----------|
+| `\includegraphics{logo.pdf}` | bundle-katalogen först, serverns arbetskatalog som fallback |
+| `\includegraphics{./logo.pdf}` | enbart bundle-katalogen |
+
+Heter en fil likadant i bundlen och i serverns arbetskatalog vinner bundlens kopia. Assets laddas upp med filnamn utan sökvägsseparatorer, så referera dem med just filnamnet — sökvägar uppåt (`../`) pekar utanför bundlen och ingår inte i kontraktet.
 
 ## Lokal utveckling
 

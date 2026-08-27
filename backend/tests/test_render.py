@@ -52,6 +52,36 @@ def test_render_validation_error_returns_structured_400():
     assert "text" in detail["message"]  # mentions the missing field
 
 
+def test_render_block_error_message_carries_body_index():
+    """Block validation errors point at the offending block as `body[i]`.
+
+    klartex wraps block validation as ValueError, so the position reaches
+    clients only inside `detail.message` — there is no structured `path`
+    for this case. The assertion pins that the index survives the
+    passthrough in render.py.
+    """
+    body = {
+        "template": "_block",
+        "data": {
+            "body": [
+                {"type": "heading", "text": "ok"},
+                {"type": "text"},  # missing required `text`
+            ]
+        },
+    }
+    r = client.post("/render", json=body)
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert detail["type"] == "input_error"
+    assert "body[1]" in detail["message"]
+    assert "path" not in detail
+
+    body["data"]["body"] = [{"type": "text"}]
+    r = client.post("/render", json=body)
+    assert r.status_code == 400
+    assert "body[0]" in r.json()["detail"]["message"]
+
+
 def test_render_unknown_template_returns_400():
     r = client.post("/render", json={"template": "nope", "data": {}})
     assert r.status_code == 400
