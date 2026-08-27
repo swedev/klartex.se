@@ -38,6 +38,7 @@ Tills webappen byggs: ändringar i landningssidan görs direkt i `index.html`/`l
 
 - **Användarvänd text** (UI-strängar, fel-meddelanden, README, CHANGELOG, planerings-dokument): svenska.
 - **Kod, identifiers, kommentarer i kod, commit messages, docstrings**: engelska.
+- **GitHub issues och pull requests** (titel och body): engelska.
 - **Konversation med användaren** (Martin Söderholm): svenska — matcha språket i användarens senaste meddelande.
 
 ## Designkonvention
