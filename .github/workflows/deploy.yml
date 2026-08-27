@@ -1,0 +1,213 @@
+name: Deploy
+
+# A v* tag deploys that version to the production server. The image itself
+# is built and smoke-tested by backend.yml when the commit lands on main;
+# this workflow verifies that image exists and rolls it out. Rebuilding here
+# would repeat a ~15 minute arm64 build of a 7 GB TeX Live image for a
+# byte-identical result.
+#
+# workflow_dispatch from a tag re-deploys that tag (rollback).
+#
+# The frontend at app.klartex.se is not deployed here: /srv/app is fed from
+# app/dist, a build artifact with no source in this repo (#14).
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+# Never interleave two deploys on the server. Queued runs wait rather than
+# cancel: a v0.2.4 push right after v0.2.3 should deploy both, in order.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # Tag guard: the dispatch UI preselects the default branch, and an
+    # untagged main build must never reach production.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The tag names the version; pyproject.toml is what /health reports and
+      # what backend.yml tagged the image with. A mismatch would deploy an
+      # image whose reported version disagrees with the release.
+      - name: Resolve version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pyproject=$(python3 -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          if [[ "$version" != "$pyproject" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match backend/pyproject.toml version $pyproject" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Fail before touching the server if the image was never built — the
+      # tag may point at a commit that never landed on main.
+      - name: Verify image exists in GHCR
+        run: |
+          image="ghcr.io/swedev/klartex-se-backend:${{ steps.version.outputs.version }}"
+          docker buildx imagetools inspect "$image" > /dev/null || {
+            echo "$image not found — push the commit to main first so backend.yml builds it" >&2
+            exit 1
+          }
+
+      # The host key is pinned via the SSH_KNOWN_HOSTS secret rather than
+      # trusting whatever ssh-keyscan returns at deploy time. To rotate
+      # (e.g. after a server rebuild), verify the fingerprint against the
+      # server's /etc/ssh/ssh_host_*_key.pub, then:
+      #   ssh-keyscan -H <host> | gh secret set SSH_KNOWN_HOSTS
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 0700 ~/.ssh
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 0600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 0644 ~/.ssh/known_hosts
+
+      # infra/.env is deliberately excluded: it is gitignored, so it does not
+      # exist in this checkout, and --delete would otherwise remove the
+      # server's copy and take the stack down. BACKEND_VERSION is written on
+      # the server instead, in the deploy step below. rsync protects excluded
+      # paths from --delete, so the server's .env survives untouched.
+      - name: Sync infra and landing page
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+
+          ssh $SSH_OPTS "klartex@$HOST" \
+            'if [[ ! -f /srv/klartex/.env ]]; then
+               echo "/srv/klartex/.env is missing — create it on the server once, see infra/README.md" >&2
+               exit 1
+             fi
+             umask 022; mkdir -p /srv/klartex-deploy-backup
+             rm -rf /srv/klartex-deploy-backup/*
+             for f in docker-compose.yml Caddyfile .env; do
+               [[ -f "/srv/klartex/$f" ]] && cp "/srv/klartex/$f" /srv/klartex-deploy-backup/
+             done
+             [[ -d /srv/klartex/caddy ]] && cp -r /srv/klartex/caddy /srv/klartex-deploy-backup/
+             echo "  backed up running config"'
+
+          rsync -av --delete -e "ssh $SSH_OPTS" \
+            --exclude=.env \
+            --exclude=caddy-data --exclude=caddy-config --exclude=page-templates \
+            infra/ "klartex@$HOST:/srv/klartex/"
+
+          rsync -av --delete -e "ssh $SSH_OPTS" \
+            --include='index.html' --include='llms.txt' --exclude='*' \
+            ./ "klartex@$HOST:/srv/site/"
+
+      - name: Build Caddy, preflight, and restart
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "klartex@$HOST" "export VERSION='$VERSION' && bash -se" <<'REMOTE'
+          set -Eeuo pipefail
+          cd /srv/klartex
+
+          # The image id behind klartex-se-caddy:local before this deploy
+          # rebuilds it. Empty on the first deploy, when the tag does not
+          # exist yet.
+          prev_caddy_image="$(docker image inspect --format '{{.Id}}' klartex-se-caddy:local 2>/dev/null || true)"
+          restarted=0
+
+          restore() {
+              trap - ERR
+              echo "✗ deploy failed — restoring config from /srv/klartex-deploy-backup"
+              cp /srv/klartex-deploy-backup/docker-compose.yml \
+                 /srv/klartex-deploy-backup/Caddyfile \
+                 /srv/klartex-deploy-backup/.env /srv/klartex/
+              rm -rf /srv/klartex/caddy
+              if [[ -d /srv/klartex-deploy-backup/caddy ]]; then
+                  cp -r /srv/klartex-deploy-backup/caddy /srv/klartex/
+              fi
+              # A completed build has already moved klartex-se-caddy:local to
+              # the new image. Restoring the old Dockerfile does not undo that
+              # — `up -d` never rebuilds — so point the tag back at the image
+              # that was running, or the restored Caddyfile would start on the
+              # new binary.
+              if [[ -n "$prev_caddy_image" ]]; then
+                  docker image tag "$prev_caddy_image" klartex-se-caddy:local
+              fi
+              if [[ "$restarted" == 1 ]]; then
+                  sudo systemctl restart klartex-stack.service
+              else
+                  echo "  stack was never stopped — running containers are untouched"
+              fi
+              exit 1
+          }
+          trap restore ERR
+
+          # Record the version in .env so the systemd unit's `docker compose
+          # up -d` resolves the deployed image rather than the previous one.
+          sed -i '/^BACKEND_VERSION=/d' .env
+          printf 'BACKEND_VERSION=%s\n' "$VERSION" >> .env
+
+          # The caddy image is built here, not pulled: `docker compose pull`
+          # alone would try to fetch klartex-se-caddy:local from a registry.
+          if docker compose pull --help | grep -q -- --ignore-buildable; then
+              docker compose pull --ignore-buildable
+          else
+              docker compose pull backend
+          fi
+
+          # The systemd unit runs `docker compose up -d`, which does not
+          # rebuild on a changed Dockerfile — build explicitly.
+          docker compose build --pull caddy
+
+          # Preflight the new binary and config before the running stack is
+          # stopped. `docker compose run` keeps the service's container_name
+          # and would collide with the running caddy container, so the built
+          # image is exercised directly.
+          docker run --rm klartex-se-caddy:local \
+              caddy list-modules | grep -q 'http\.handlers\.rate_limit'
+          docker run --rm -v /srv/klartex/Caddyfile:/etc/caddy/Caddyfile:ro klartex-se-caddy:local \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+          restarted=1
+          sudo systemctl restart klartex-stack.service
+          sleep 5
+          docker compose ps
+          running="$(docker compose ps --services --filter status=running)"
+          for svc in backend caddy; do
+              grep -qx "$svc" <<<"$running" || {
+                  echo "service $svc is not running after restart"
+                  false
+              }
+          done
+
+          # The version the API actually reports has to match what was
+          # deployed — a stale container would otherwise pass the checks above.
+          for i in 1 2 3 4 5 6; do
+              reported="$(curl -fsS http://127.0.0.1:8000/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+              if [[ "$reported" == "$VERSION" ]]; then
+                  echo "health check: OK ($reported)"
+                  trap - ERR
+                  exit 0
+              fi
+              sleep 5
+          done
+          echo "health check FAILED — /health reports '${reported:-nothing}', expected '$VERSION'" >&2
+          false
+          REMOTE
+
+      - name: Report version
+        run: echo "Deployed ${{ github.ref_name }} to production" >> "$GITHUB_STEP_SUMMARY"

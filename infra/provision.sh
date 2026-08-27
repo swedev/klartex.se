@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # --- Config -----------------------------------------------------------------
-SERVER_NAME="${SERVER_NAME:-klartex-api-1}"
+SERVER_NAME="${SERVER_NAME:-klartex-1}"
 SERVER_TYPE="${SERVER_TYPE:-cax11}"        # ARM, 2 vCPU, 4GB, ~€3.79/mån
 LOCATION="${LOCATION:-hel1}"               # Helsinki — lowest latency from SE
 IMAGE="${IMAGE:-ubuntu-24.04}"
@@ -88,6 +88,6 @@ Next steps:
   2. Wait ~2 min for cloud-init to finish, then verify:
        ssh klartex@$IP "cloud-init status --wait && docker --version"
 
-  3. From this repo: ./deploy/deploy.sh $IP
+  3. Put /srv/klartex/.env on the server (once), then push a v* tag to deploy.
 ────────────────────────────────────────────────────────
 EOF

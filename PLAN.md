@@ -23,7 +23,7 @@ Den definitionen kommer från `../projects/klartex/wysiwyg.md`. Detta dokument b
 
 **Page-template-registry 2026-05-12 (`backend 0.2.1`):** Branding (`.tex.jinja` + assets som logotyper, fonter) laddas upp en gång till `/page-templates/<namn>` med admin-token, lagras persistent i `/srv/klartex/page-templates`, och refereras sedan från `/render` via `page_template: "<namn>"`. Stand-alone-rendering med inline `page_template_source` finns kvar för engångsfall. Microsoft core fonts (Georgia, Arial, Times New Roman) ingår nu i backend-imagen. VKF:s branding ligger i registret som `vkf` och renderar end-to-end mot live-API:t.
 
-Infrastruktur i `infra/` + `deploy/`; backend i `backend/`; runbook i [`infra/README.md`](infra/README.md) + [`backend/README.md`](backend/README.md).
+Infrastruktur i `infra/`; backend i `backend/`; runbook i [`infra/README.md`](infra/README.md) + [`backend/README.md`](backend/README.md).
 
 ## Vad MVP:n *inte* är
 
@@ -58,7 +58,7 @@ Mål: kärnan körs som API någonstans nåbart, hela domänen levande, smoke-te
 - [x] **Provisioneringsskript** (`infra/provision.sh` + `infra/cloud-init.yaml`) — idempotent, installerar Docker + ufw + fail2ban + klartex-user + systemd-unit.
 - [x] **Stack live.** Docker Compose med Caddy + klartex-API, version-pinnad via `infra/.env`. Caddy hanterar TLS via Let's Encrypt, tre vhosts (`klartex.se`, `app.klartex.se`, `api.klartex.se`).
 - [x] **DNS uppdaterat** i Loopia. Wildcard borttaget, explicita A-records för alla fyra hostnamn. Loopia-mail intakt (MX, SPF, DKIM, autodiscover).
-- [x] **Deploy-flöde** (`deploy/deploy.sh`) — rsync compose+Caddyfile+statiska filer, `docker compose pull`, systemd-restart.
+- [x] **Deploy-flöde** (`.github/workflows/deploy.yml`) — `v*`-tagg syncar compose+Caddyfile+statiska filer, pullar image, restartar via systemd.
 - [x] **Smoke-test grön.** `https://klartex.se` servar landningssidan, `https://api.klartex.se/templates` returnerar mall-listan.
 
 **Inte** med i fas 0 (medvetet, kommer i fas 1):
