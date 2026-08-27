@@ -66,6 +66,11 @@ $SSH bash -se <<'REMOTE'
 set -Eeuo pipefail
 cd /srv/klartex
 
+# The image id behind klartex-se-caddy:local before this deploy rebuilds it.
+# Empty on the first deploy, when the tag does not exist yet.
+prev_caddy_image="$(docker image inspect --format '{{.Id}}' klartex-se-caddy:local 2>/dev/null || true)"
+restarted=0
+
 restore() {
     trap - ERR
     echo "✗ deploy failed — restoring config from /srv/klartex-deploy-backup"
@@ -76,7 +81,18 @@ restore() {
     if [[ -d /srv/klartex-deploy-backup/caddy ]]; then
         cp -r /srv/klartex-deploy-backup/caddy /srv/klartex/
     fi
-    sudo systemctl restart klartex-stack.service
+    # A completed build has already moved klartex-se-caddy:local to the new
+    # image. Restoring the old Dockerfile does not undo that — `up -d` never
+    # rebuilds — so point the tag back at the image that was running, or the
+    # restored Caddyfile would start on the new binary.
+    if [[ -n "$prev_caddy_image" ]]; then
+        docker image tag "$prev_caddy_image" klartex-se-caddy:local
+    fi
+    if [[ "$restarted" == 1 ]]; then
+        sudo systemctl restart klartex-stack.service
+    else
+        echo "  stack was never stopped — running containers are untouched"
+    fi
     exit 1
 }
 trap restore ERR
@@ -94,9 +110,14 @@ fi
 docker compose build --pull caddy
 
 # Preflight the new binary and config before the running stack is stopped.
-docker compose run --rm --no-deps caddy caddy list-modules | grep -q 'http\.handlers\.rate_limit'
-docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# `docker compose run` keeps the service's container_name and would collide
+# with the running caddy container, so the built image is exercised directly.
+docker run --rm klartex-se-caddy:local \
+    caddy list-modules | grep -q 'http\.handlers\.rate_limit'
+docker run --rm -v /srv/klartex/Caddyfile:/etc/caddy/Caddyfile:ro klartex-se-caddy:local \
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+restarted=1
 sudo systemctl restart klartex-stack.service
 sleep 5
 docker compose ps
