@@ -25,8 +25,13 @@ echo '{"invoice_number": "2026-001", ...}' | klartex -t faktura
 ## Available templates
 
 - `_block` — Universal block engine. The agent composes the document freely from typed blocks.
+- `balansrakning` — Balance sheet with assets and liabilities+equity sections.
+- `budgetrapport` — Budget report with account codes, budgeted amounts, and actuals.
 - `faktura` — Invoice with line items, VAT, and payment info.
+- `kvitto` — Receipt with line items, total, and payment method.
 - `protokoll` — Meeting minutes with agenda, decisions, and adjusters.
+- `resultatrakning` — Income statement with comparison years and optional notes.
+- `sie-exportrapport` — Human-readable PDF of SIE4 accounting data.
 
 ## Get the JSON Schema for a template
 
@@ -85,9 +90,19 @@ Save as `doc.json`, then run: `klartex -d doc.json`
 
 ## Block types (for _block template)
 
-heading, text, title_page, parties, clause, signatures, metadata_table, attendees, agenda, name_roster, adjuster_signatures, page_break, latex
+agenda, budgettabell, callout, clause, columns, description_list, form, heading, latex, list, name_roster, notapparat, page_break, parties, quote, resultatrakning, signatures, table, text, title_page
 
-Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API.
+Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API at https://api.klartex.se (`GET /blocks`, `GET /blocks/{name}/schema`).
+
+## Page setup and branding in recipes
+
+Every recipe template accepts `page_template` in object form, the same shape the block engine uses. Alongside the page-template name it carries `font` and `header_font` (fontspec family names; `header_font` falls back to `font`) and a `footer` rendered in three aligned columns (address | company | payment).
+
+`faktura` and `kvitto` additionally take a top-level `footer` — the canonical place for payment details, taking precedence over the page template's footer — plus `sender` (an issuer block beside the recipient) and `logo` / `logo_height` / `logo_offset` in the header.
+
+## Number formatting
+
+Amounts and quantities render in Swedish style by default (`32 400,00` — thin-space grouping, decimal comma). The document language picks the style; `number_format` (`sv` or `en`) in `faktura` / `kvitto` data overrides it.
 
 ## Links
 

@@ -1,4 +1,4 @@
-"""Page-template registry — named bundles of .tex.jinja + assets.
+r"""Page-template registry — named bundles of .tex.jinja + assets.
 
 Stored on disk at PAGE_TEMPLATES_DIR (default /data/page-templates). Each
 bundle is a directory:
@@ -11,6 +11,25 @@ bundle is a directory:
 Names are restricted to [a-z0-9-]{1,64} so they're safe as path segments
 and URL-friendly. Asset filenames must not contain path separators or
 leading dots.
+
+Asset resolution
+----------------
+The bundle directory is handed to `klartex.render(asset_dir=...)`, which
+puts it on TEXINPUTS and runs xelatex with it as cwd. Two reference forms
+behave differently inside the .tex.jinja:
+
+* Bare filename (`\includegraphics{logo.pdf}`) — resolved via TEXINPUTS:
+  the bundle directory first, the server process cwd as fallback.
+* Explicit relative (`\includegraphics{./logo.pdf}`) — Kpathsea never
+  consults TEXINPUTS for these, so it resolves against the bundle
+  directory only, with no cwd fallback.
+
+When a name exists both in the bundle and in the process cwd, the
+bundle's copy wins. Parent-relative references are out of contract:
+asset filenames carry no path separators, so no bundle can create that
+layout through the API, and such a reference escapes the bundle —
+`../shared.tex` lands in the registry root, `../other/logo.pdf` in
+another bundle.
 
 Forward-compat note: once orgs+auth land (fas 5), this layout migrates to
 /data/orgs/<org>/page-templates/<name>/. The same internal API stays.
