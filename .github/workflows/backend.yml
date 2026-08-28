@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      # The base image is built by backend-base.yml. An app build on top
+      # of an unchanged FROM pin would produce byte-identical layers.
+      - '!backend/Dockerfile.base'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
     inputs:
