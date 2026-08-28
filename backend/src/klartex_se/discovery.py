@@ -48,9 +48,10 @@ def blocks() -> list[dict]:
 @router.get("/blocks/{name}/schema")
 def block_schema(name: str) -> dict:
     """JSON Schema for a single block type."""
-    components = list_components()
-    spec = components.get(name)
-    if spec is None or spec.block_schema_path is None:
+    spec = list_components().get(name)
+    # block_schema_path is a bare filename relative to klartex's schema
+    # directory; get_block_schema resolves and loads it.
+    schema = spec.get_block_schema() if spec is not None else None
+    if schema is None:
         raise HTTPException(404, f"Unknown block type: {name}")
-    import json
-    return json.loads(spec.block_schema_path.read_text())
+    return schema

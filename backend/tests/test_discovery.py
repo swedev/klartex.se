@@ -45,6 +45,23 @@ def test_blocks_includes_known_types():
     assert {"heading", "text", "agenda", "signatures"} <= names
 
 
+def test_block_schema_returns_the_schema():
+    # Every block listed by /blocks must have a fetchable schema. Only the
+    # 404 path was covered before, so this endpoint answered 500 in
+    # production without any test noticing.
+    for name in ("text", "heading", "agenda"):
+        r = client.get(f"/blocks/{name}/schema")
+        assert r.status_code == 200, f"{name}: {r.status_code} {r.text[:120]}"
+        body = r.json()
+        assert isinstance(body, dict) and body, f"{name}: empty schema"
+
+
+def test_every_listed_block_has_a_schema():
+    names = [b["name"] for b in client.get("/blocks").json()]
+    broken = [n for n in names if client.get(f"/blocks/{n}/schema").status_code != 200]
+    assert not broken, f"blocks listed but without a fetchable schema: {broken}"
+
+
 def test_block_schema_unknown():
     r = client.get("/blocks/not-a-real-block/schema")
     assert r.status_code == 404
