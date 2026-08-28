@@ -21,7 +21,7 @@ Den definitionen kommer från `../projects/klartex/wysiwyg.md`. Detta dokument b
 
 **Arkitekturskifte 2026-05-11:** HTTP-yta flyttad från kärnan (`klartex serve` borttagen i `v0.11.0`) till `backend/` i detta repo — FastAPI som importerar `klartex` som library. Image: `ghcr.io/swedev/klartex-se-backend`.
 
-**Page-template-registry 2026-05-12 (`backend 0.2.1`):** Branding (`.tex.jinja` + assets som logotyper, fonter) laddas upp en gång till `/page-templates/<namn>` med admin-token, lagras persistent i `/srv/klartex/page-templates`, och refereras sedan från `/render` via `page_template: "<namn>"`. Stand-alone-rendering med inline `page_template_source` finns kvar för engångsfall. Microsoft core fonts (Georgia, Arial, Times New Roman) ingår nu i backend-imagen. VKF:s branding ligger i registret som `vkf` och renderar end-to-end mot live-API:t.
+**Page-template-registry 2026-05-12 (`backend 0.2.1`):** Branding (`.tex.jinja` + assets som logotyper, fonter) laddas upp en gång till `/page-templates/<namn>` med admin-token, lagras persistent i `~klartex/klartex/page-templates`, och refereras sedan från `/render` via `page_template: "<namn>"`. Stand-alone-rendering med inline `page_template_source` finns kvar för engångsfall. Microsoft core fonts (Georgia, Arial, Times New Roman) ingår nu i backend-imagen. VKF:s branding ligger i registret som `vkf` och renderar end-to-end mot live-API:t.
 
 Infrastruktur i `infra/`; backend i `backend/`; runbook i [`infra/README.md`](infra/README.md) + [`backend/README.md`](backend/README.md).
 
@@ -165,7 +165,7 @@ Frågor som behöver besvaras i detta steg är listade under "TBD" i `../project
 | **Hosting (API + frontend)** | Hetzner Cloud `cax11` (ARM, nbg1), Ubuntu 24.04, Docker Compose | Egen VM ger XeLaTeX out-of-the-box och billigare än Fly.io. Inte Cloudflare Pages — vi har redan Caddy som kan servera statiska filer. |
 | **Reverse proxy / TLS** | Caddy 2 med automatisk Let's Encrypt | `Caddyfile` i `infra/`. Tre vhosts. |
 | **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, `texlive/texlive:latest`-bas + mscorefonts) | Pinad version i `infra/.env`, aldrig `:latest` i prod. CI smoke-testar amd64-bygget innan multi-arch-push. |
-| **Page-template-registry** | Filbaserad (`/srv/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn, admin-token-auth | Live sedan `backend 0.2.1` (2026-05-12). Per-org-auth tas i fas 5. |
+| **Page-template-registry** | Filbaserad (`~klartex/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn, admin-token-auth | Live sedan `backend 0.2.1` (2026-05-12). Per-org-auth tas i fas 5. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | (a)-alternativet. Bryts ut till eget repo om scopet växer. |
 | **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp, `api.klartex.se` = klartex serve | DNS hos Loopia, kärnan i Hetzner. |
 | **Frontend-stack** | **Förslag (inte beslutat):** React + Vite + Tiptap + TanStack Query + TailwindCSS | Bestäms vid fas 1-start. Alt: Svelte/SvelteKit. |

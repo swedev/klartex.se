@@ -42,7 +42,7 @@ write_files:
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      WorkingDirectory=/srv/klartex
+      WorkingDirectory=/home/klartex/klartex
       ExecStart=/usr/bin/docker compose up -d --remove-orphans
       ExecStop=/usr/bin/docker compose down
 
@@ -79,8 +79,8 @@ runcmd:
   - ufw allow 443/tcp
 
   # Prepare deployment directory; the deploy workflow rsyncs into here.
-  - mkdir -p /srv/klartex /srv/klartex/caddy-data /srv/klartex/caddy-config /srv/klartex/page-templates /srv/site /srv/app
-  - chown -R klartex:klartex /srv/klartex /srv/site /srv/app
+  - mkdir -p /home/klartex/klartex/caddy-data /home/klartex/klartex/caddy-config /home/klartex/klartex/page-templates /home/klartex/site /home/klartex/app
+  - chown -R klartex:klartex /home/klartex/klartex /home/klartex/site /home/klartex/app
 
   # Lock SSH down: no root, no password.
   - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -91,4 +91,4 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable klartex-stack.service
 
-final_message: "klartex.se server provisioned. Add /srv/klartex/.env, then push a v* tag to deploy."
+final_message: "klartex.se server provisioned. Add ~/klartex/.env, then push a v* tag to deploy."

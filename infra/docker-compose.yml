@@ -1,5 +1,5 @@
 # klartex.se production stack.
-# Deployed to /srv/klartex/docker-compose.yml on the Hetzner server.
+# Deployed to ~klartex/klartex/docker-compose.yml on the Hetzner server.
 # Pinned version comes from .env (BACKEND_VERSION); never use :latest in prod.
 
 services:
@@ -24,7 +24,7 @@ services:
     volumes:
       # Persistent storage for uploaded page-template bundles.
       # Lives outside the container so docker compose pull doesn't wipe them.
-      - /srv/klartex/page-templates:/data/page-templates
+      - ./page-templates:/data/page-templates
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
@@ -45,8 +45,8 @@ services:
       - "443:443/udp"   # HTTP/3
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - /srv/site:/srv/site:ro          # static landing page
-      - /srv/app:/srv/app:ro            # frontend dist
+      - /home/klartex/site:/srv/site:ro          # static landing page
+      - /home/klartex/app:/srv/app:ro            # frontend dist
       - ./caddy-data:/data              # certificates
       - ./caddy-config:/config
     depends_on:
