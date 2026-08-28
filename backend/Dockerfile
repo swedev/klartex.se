@@ -1,14 +1,17 @@
 # App image for the klartex.se backend — the heavy TeX Live layers live in
-# the base image ghcr.io/swedev/klartex-se-base, built from
-# backend/Dockerfile.base by .github/workflows/backend-base.yml. Only the
-# venv and the app source are built here, so a release build takes a
-# couple of minutes instead of rebuilding ~7 GB under QEMU.
+# the base image ghcr.io/swedev/klartex-base, built from docker/Dockerfile.base
+# in swedev/klartex by its base-image.yml, which runs the klartex test suite
+# inside the freshly built amd64 image before pushing. Only the venv and the
+# app source are built here, so a release build takes a couple of minutes
+# instead of rebuilding ~7 GB under QEMU.
 #
-# Bumping the base: change backend/Dockerfile.base and merge — the base
-# workflow publishes a new tag — then update the FROM pin below in a
-# separate PR. The pin carries both tag (readability) and manifest digest
-# (immutability); never point at a moving reference.
-FROM ghcr.io/swedev/klartex-se-base:20260828-1@sha256:640992b132b9880eb0f801b81ac5f30ea64190243fa8900fbfda098cb158562b
+# Bumping the base: bump it in swedev/klartex and wait for its base-image.yml
+# to publish, then copy the image reference
+# ghcr.io/swedev/klartex-base:<tag>@<digest> from that run's step summary into
+# the FROM line below, in a separate PR here. The pin carries both tag
+# (readability) and manifest digest (immutability); never point at a moving
+# reference.
+FROM ghcr.io/swedev/klartex-base:20260828-3@sha256:b011056413d449bdc41b893ff1bd538a2be46d78d3794698eb134f45936d6ff2
 
 WORKDIR /app
 RUN python3 -m venv /opt/venv \
