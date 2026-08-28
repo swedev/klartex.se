@@ -99,6 +99,6 @@ ssh klartex@<ip> "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
 ## Saker som *inte* finns här (medvetet)
 
 - **Databas.** Tillkommer i MVP fas 5 (konton/persistens).
-- **Frontend-build och -deploy.** `app/dist` har ingen källkod i repot, så deploy-workflowen rör inte `~/app`. Tillkommer med frontend-källan (#14).
+- **Frontend-build och -deploy.** Källan till `app/dist` ligger på den omergade #14-grenen, inte på `main`, så en CI-utcheckning har inget att bygga och deploy-workflowen rör inte `~/app`. `app.klartex.se` servar det som senast lagts dit för hand. Hör hemma i workflowen när #14 landar.
 - **Monitoring/alerting.** Hetzners egna metrics räcker tills appen lever på riktigt.
 - **Backups bortom Hetzner snapshots.** Aktivera "automatic backups" på servern (+20%) när data finns.
