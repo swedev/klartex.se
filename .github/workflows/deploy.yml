@@ -8,7 +8,7 @@ name: Deploy
 #
 # workflow_dispatch from a tag re-deploys that tag (rollback).
 #
-# The frontend at app.klartex.se is not deployed here: /srv/app is fed from
+# The frontend at app.klartex.se is not deployed here: ~/app is fed from
 # app/dist, a build artifact with no source in this repo (#14).
 
 on:
@@ -92,26 +92,26 @@ jobs:
           SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
 
           ssh $SSH_OPTS "klartex@$HOST" \
-            'if [[ ! -f /srv/klartex/.env ]]; then
-               echo "/srv/klartex/.env is missing — create it on the server once, see infra/README.md" >&2
+            'if [[ ! -f /home/klartex/klartex/.env ]]; then
+               echo "/home/klartex/klartex/.env is missing — create it on the server once, see infra/README.md" >&2
                exit 1
              fi
-             umask 022; mkdir -p /srv/klartex-deploy-backup
-             rm -rf /srv/klartex-deploy-backup/*
+             umask 022; mkdir -p /home/klartex/deploy-backup
+             rm -rf /home/klartex/deploy-backup/*
              for f in docker-compose.yml Caddyfile .env; do
-               [[ -f "/srv/klartex/$f" ]] && cp "/srv/klartex/$f" /srv/klartex-deploy-backup/
+               [[ -f "/home/klartex/klartex/$f" ]] && cp "/home/klartex/klartex/$f" /home/klartex/deploy-backup/
              done
-             [[ -d /srv/klartex/caddy ]] && cp -r /srv/klartex/caddy /srv/klartex-deploy-backup/
+             [[ -d /home/klartex/klartex/caddy ]] && cp -r /home/klartex/klartex/caddy /home/klartex/deploy-backup/
              echo "  backed up running config"'
 
           rsync -av --delete -e "ssh $SSH_OPTS" \
             --exclude=.env \
             --exclude=caddy-data --exclude=caddy-config --exclude=page-templates \
-            infra/ "klartex@$HOST:/srv/klartex/"
+            infra/ "klartex@$HOST:/home/klartex/klartex/"
 
           rsync -av --delete -e "ssh $SSH_OPTS" \
             --include='index.html' --include='llms.txt' --exclude='*' \
-            ./ "klartex@$HOST:/srv/site/"
+            ./ "klartex@$HOST:/home/klartex/site/"
 
       - name: Build Caddy, preflight, and restart
         env:
@@ -121,7 +121,7 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             "klartex@$HOST" "export VERSION='$VERSION' && bash -se" <<'REMOTE'
           set -Eeuo pipefail
-          cd /srv/klartex
+          cd /home/klartex/klartex
 
           # The image id behind klartex-se-caddy:local before this deploy
           # rebuilds it. Empty on the first deploy, when the tag does not
@@ -131,13 +131,13 @@ jobs:
 
           restore() {
               trap - ERR
-              echo "✗ deploy failed — restoring config from /srv/klartex-deploy-backup"
-              cp /srv/klartex-deploy-backup/docker-compose.yml \
-                 /srv/klartex-deploy-backup/Caddyfile \
-                 /srv/klartex-deploy-backup/.env /srv/klartex/
-              rm -rf /srv/klartex/caddy
-              if [[ -d /srv/klartex-deploy-backup/caddy ]]; then
-                  cp -r /srv/klartex-deploy-backup/caddy /srv/klartex/
+              echo "✗ deploy failed — restoring config from /home/klartex/deploy-backup"
+              cp /home/klartex/deploy-backup/docker-compose.yml \
+                 /home/klartex/deploy-backup/Caddyfile \
+                 /home/klartex/deploy-backup/.env /home/klartex/klartex/
+              rm -rf /home/klartex/klartex/caddy
+              if [[ -d /home/klartex/deploy-backup/caddy ]]; then
+                  cp -r /home/klartex/deploy-backup/caddy /home/klartex/klartex/
               fi
               # A completed build has already moved klartex-se-caddy:local to
               # the new image. Restoring the old Dockerfile does not undo that
@@ -179,7 +179,7 @@ jobs:
           # image is exercised directly.
           docker run --rm klartex-se-caddy:local \
               caddy list-modules | grep -q 'http\.handlers\.rate_limit'
-          docker run --rm -v /srv/klartex/Caddyfile:/etc/caddy/Caddyfile:ro klartex-se-caddy:local \
+          docker run --rm -v /home/klartex/klartex/Caddyfile:/etc/caddy/Caddyfile:ro klartex-se-caddy:local \
               caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
           restarted=1

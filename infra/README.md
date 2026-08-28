@@ -8,7 +8,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 |-----|------|
 | `provision.sh` | Skapar Hetzner-firewall + server från scratch. Idempotent. |
 | `cloud-init.yaml` | Körs en gång vid första boot: installerar Docker, sätter upp användare, brandvägg, systemd-unit. |
-| `docker-compose.yml` | Stackdefinition: Caddy + klartex-API. Deployas till `/srv/klartex/`. |
+| `docker-compose.yml` | Stackdefinition: Caddy + klartex-API. Deployas till `~/klartex/` på servern. |
 | `Caddyfile` | TLS + tre vhosts: `klartex.se`, `app.klartex.se`, `api.klartex.se`. Rate limit + body-gräns på `POST /render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
 | `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION`. |
@@ -28,8 +28,8 @@ Förutsätter att `hcloud` CLI är autentiserad och SSH-nyckeln uppladdad (se kl
 # 3. Lägg env-filen på servern. Den görs en gång för hand och versionshanteras
 #    aldrig — den bär ADMIN_TOKEN. Deployen läser den, men rör aldrig annat än
 #    BACKEND_VERSION-raden.
-scp infra/.env.example klartex@<ip>:/srv/klartex/.env
-ssh -t klartex@<ip> "nano /srv/klartex/.env"
+scp infra/.env.example klartex@<ip>:klartex/.env
+ssh -t klartex@<ip> "nano ~/klartex/.env"
 
 # 4. Första deploy: tagga en version vars image finns i GHCR
 git tag v0.2.3 && git push origin v0.2.3
@@ -54,7 +54,7 @@ Både Caddy-versionen och modul-committen är pinnade i `caddy/Dockerfile`. Uppg
 
 Serverkrav för bygget: utgående åtkomst till Docker Hub, GitHub och Go-modulproxyn, plus disk och RAM för Go-kompileringen (någon minut första gången; Docker cachear tills `caddy/Dockerfile` ändras).
 
-Deploy-workflowen bygger imagen och kör preflight — `caddy list-modules` (modulen finns i binären) och `caddy validate` (Caddyfilen parsar) — innan den körande stacken stoppas. Konfigen som ligger på servern säkerhetskopieras till `/srv/klartex-deploy-backup/` före rsyncen och återställs automatiskt om bygget, preflighten eller omstarten fallerar; `klartex-se-caddy:local` pekas då tillbaka på imagen som körde. Fallerar något före omstarten rörs den körande stacken inte alls.
+Deploy-workflowen bygger imagen och kör preflight — `caddy list-modules` (modulen finns i binären) och `caddy validate` (Caddyfilen parsar) — innan den körande stacken stoppas. Konfigen som ligger på servern säkerhetskopieras till `~/deploy-backup/` före rsyncen och återställs automatiskt om bygget, preflighten eller omstarten fallerar; `klartex-se-caddy:local` pekas då tillbaka på imagen som körde. Fallerar något före omstarten rörs den körande stacken inte alls.
 
 Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka `image: caddy:2-alpine` i `docker-compose.yml` tillsammans med föregående Caddyfile, och deploya om. Certifikaten ligger i `./caddy-data` och påverkas inte.
 
@@ -69,7 +69,7 @@ Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), o
 Imagen `ghcr.io/swedev/klartex` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
 https://github.com/orgs/swedev/packages/container/klartex/settings
 
-Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i serverns `/srv/klartex/.env`, och lägg till `docker login ghcr.io` i deploy-workflowens remote-block innan `pull`.
+Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i serverns `~/klartex/.env`, och lägg till `docker login ghcr.io` i deploy-workflowens remote-block innan `pull`.
 
 ## Säkerhet
 
@@ -86,11 +86,11 @@ Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`
 ssh klartex@<ip> "cloud-init status"
 
 # Stacken körs?
-ssh klartex@<ip> "docker compose -f /srv/klartex/docker-compose.yml ps"
+ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml ps"
 
 # Loggar
-ssh klartex@<ip> "docker compose -f /srv/klartex/docker-compose.yml logs --tail=200 klartex"
-ssh klartex@<ip> "docker compose -f /srv/klartex/docker-compose.yml logs --tail=200 caddy"
+ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml logs --tail=200 klartex"
+ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml logs --tail=200 caddy"
 
 # Caddy reload utan restart
 ssh klartex@<ip> "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
@@ -99,6 +99,6 @@ ssh klartex@<ip> "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
 ## Saker som *inte* finns här (medvetet)
 
 - **Databas.** Tillkommer i MVP fas 5 (konton/persistens).
-- **Frontend-build och -deploy.** `app/dist` har ingen källkod i repot, så deploy-workflowen rör inte `/srv/app`. Tillkommer med frontend-källan (#14).
+- **Frontend-build och -deploy.** `app/dist` har ingen källkod i repot, så deploy-workflowen rör inte `~/app`. Tillkommer med frontend-källan (#14).
 - **Monitoring/alerting.** Hetzners egna metrics räcker tills appen lever på riktigt.
 - **Backups bortom Hetzner snapshots.** Aktivera "automatic backups" på servern (+20%) när data finns.

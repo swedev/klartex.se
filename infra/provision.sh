@@ -88,6 +88,6 @@ Next steps:
   2. Wait ~2 min for cloud-init to finish, then verify:
        ssh klartex@$IP "cloud-init status --wait && docker --version"
 
-  3. Put /srv/klartex/.env on the server (once), then push a v* tag to deploy.
+  3. Put ~klartex/klartex/.env on the server (once), then push a v* tag to deploy.
 ────────────────────────────────────────────────────────
 EOF
