@@ -1,0 +1,99 @@
+name: Build and publish backend base image
+
+# The heavy, rarely changing layers of the backend image — TeX Live,
+# mscorefonts, apt packages — live in backend/Dockerfile.base and are
+# published here as ghcr.io/swedev/klartex-se-base. backend/Dockerfile
+# pins a tag + manifest digest from this registry, so an app build pulls
+# these layers instead of rebuilding them.
+#
+# Runs only when the base file (or this workflow) changes — a few times a
+# year. The ~15-20 minute QEMU arm64 build is the price of that run, and
+# is why no GHA cache is configured: ~7 GB per architecture never fits in
+# the 10 GB repo cache anyway.
+#
+# Bumping the base: change Dockerfile.base, merge, wait for the tag this
+# workflow publishes, then open a separate PR that moves the FROM pin in
+# backend/Dockerfile. Published tags referenced by any Dockerfile in the
+# history must never be deleted.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/Dockerfile.base'
+      - '.github/workflows/backend-base.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag. Defaults to <YYYYMMDD>-<run number>.'
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build and push base image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `latest`: nothing should ever point at a moving reference, so
+      # it does not exist to point at. The run number keeps the tag unique
+      # when the base is rebuilt twice on the same day; true immutability
+      # comes from the digest the consumer pins.
+      #
+      # The dispatch input reaches the script through env, never through
+      # ${{ }}: interpolation happens before bash parses the line, so a
+      # crafted tag would run as commands in a job holding packages:write.
+      # It is validated against the Docker tag grammar for the same reason.
+      - name: Resolve tag
+        id: meta
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          tag="$INPUT_TAG"
+          if [[ -z "$tag" ]]; then
+            tag="$(date -u +%Y%m%d)-${RUN_NUMBER}"
+          fi
+          if [[ ! "$tag" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$ ]]; then
+            echo "invalid image tag: $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.base
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/swedev/klartex-se-base:${{ steps.meta.outputs.tag }}
+
+      # The digest is what backend/Dockerfile pins, so print it where the
+      # follow-up PR can copy it from.
+      - name: Report pin
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "Pin this in \`backend/Dockerfile\`:"
+            echo
+            echo '```'
+            echo "FROM ghcr.io/swedev/klartex-se-base:${TAG}@${DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
