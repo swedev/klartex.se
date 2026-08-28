@@ -66,8 +66,8 @@ Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), o
 
 ## Tillgång till GHCR-imagen
 
-Imagen `ghcr.io/swedev/klartex` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
-https://github.com/orgs/swedev/packages/container/klartex/settings
+Imagen `ghcr.io/swedev/klartex-se-backend` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
+https://github.com/orgs/swedev/packages/container/klartex-se-backend/settings
 
 Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i serverns `~/klartex/.env`, och lägg till `docker login ghcr.io` i deploy-workflowens remote-block innan `pull`.
 
