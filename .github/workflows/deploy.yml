@@ -8,8 +8,10 @@ name: Deploy
 #
 # workflow_dispatch from a tag re-deploys that tag (rollback).
 #
-# The frontend at app.klartex.se is not deployed here: ~/app is fed from
-# app/dist, a build artifact with no source in this repo (#14).
+# The frontend at app.klartex.se is not deployed here. ~/app is fed from
+# app/dist, and the source that builds it lives on the unmerged #14 branch
+# rather than on main, so a CI checkout has nothing to build. Once #14
+# lands, building and syncing app/dist belongs in this workflow.
 
 on:
   push:

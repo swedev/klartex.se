@@ -66,8 +66,8 @@ Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), o
 
 ## Tillgång till GHCR-imagen
 
-Imagen `ghcr.io/swedev/klartex` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
-https://github.com/orgs/swedev/packages/container/klartex/settings
+Imagen `ghcr.io/swedev/klartex-se-backend` **måste vara public** för att servern ska kunna pulla utan auth. Verifiera på:
+https://github.com/orgs/swedev/packages/container/klartex-se-backend/settings
 
 Om imagen behöver vara private framöver: skapa en GHCR-PAT med `read:packages`, lägg som `GHCR_TOKEN` i serverns `~/klartex/.env`, och lägg till `docker login ghcr.io` i deploy-workflowens remote-block innan `pull`.
 
@@ -99,6 +99,6 @@ ssh klartex@<ip> "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
 ## Saker som *inte* finns här (medvetet)
 
 - **Databas.** Tillkommer i MVP fas 5 (konton/persistens).
-- **Frontend-build och -deploy.** `app/dist` har ingen källkod i repot, så deploy-workflowen rör inte `~/app`. Tillkommer med frontend-källan (#14).
+- **Frontend-build och -deploy.** Källan till `app/dist` ligger på den omergade #14-grenen, inte på `main`, så en CI-utcheckning har inget att bygga och deploy-workflowen rör inte `~/app`. `app.klartex.se` servar det som senast lagts dit för hand. Hör hemma i workflowen när #14 landar.
 - **Monitoring/alerting.** Hetzners egna metrics räcker tills appen lever på riktigt.
 - **Backups bortom Hetzner snapshots.** Aktivera "automatic backups" på servern (+20%) när data finns.
