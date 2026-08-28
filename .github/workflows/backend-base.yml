@@ -44,12 +44,24 @@ jobs:
       # it does not exist to point at. The run number keeps the tag unique
       # when the base is rebuilt twice on the same day; true immutability
       # comes from the digest the consumer pins.
+      #
+      # The dispatch input reaches the script through env, never through
+      # ${{ }}: interpolation happens before bash parses the line, so a
+      # crafted tag would run as commands in a job holding packages:write.
+      # It is validated against the Docker tag grammar for the same reason.
       - name: Resolve tag
         id: meta
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          tag="${{ github.event.inputs.tag }}"
+          tag="$INPUT_TAG"
           if [[ -z "$tag" ]]; then
-            tag="$(date -u +%Y%m%d)-${{ github.run_number }}"
+            tag="$(date -u +%Y%m%d)-${RUN_NUMBER}"
+          fi
+          if [[ ! "$tag" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$ ]]; then
+            echo "invalid image tag: $tag" >&2
+            exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -74,11 +86,14 @@ jobs:
       # The digest is what backend/Dockerfile pins, so print it where the
       # follow-up PR can copy it from.
       - name: Report pin
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           {
             echo "Pin this in \`backend/Dockerfile\`:"
             echo
             echo '```'
-            echo "FROM ghcr.io/swedev/klartex-se-base:${{ steps.meta.outputs.tag }}@${{ steps.build.outputs.digest }}"
+            echo "FROM ghcr.io/swedev/klartex-se-base:${TAG}@${DIGEST}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
