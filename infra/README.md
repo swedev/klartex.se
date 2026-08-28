@@ -38,8 +38,8 @@ git tag v0.2.3 && git push origin v0.2.3
 ## Uppgradera backend-versionen
 
 1. Bumpa `version` i `backend/pyproject.toml` och `__version__` i `backend/src/klartex_se/__init__.py`.
-2. Merga till `main` och vänta på `backend.yml`, som bygger och pushar imagen till GHCR.
-3. Tagga samma version och pusha taggen: `git tag v0.2.4 && git push origin v0.2.4`.
+2. Merga till `main`. Ingenting byggs — `ci.yml` kör bara testerna.
+3. Tagga samma version och pusha taggen: `git tag v0.2.4 && git push origin v0.2.4`. Taggen bygger imagen, smoke-testar den, publicerar den och deployar, i den ordningen.
 4. Verifiera: `curl -fsS https://api.klartex.se/health`.
 
 Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/health` rapporterar då skulle säga olika saker.

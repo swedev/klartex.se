@@ -1,12 +1,12 @@
-name: Deploy
+name: Release
 
-# A v* tag deploys that version to the production server. Building belongs
-# in backend.yml, which builds and smoke-tests the image when the commit
-# lands on main; this workflow verifies that already-tested image exists in
-# GHCR and rolls it out. A rebuild here would produce an untested image from
-# the same source.
+# A v* tag builds the image, smoke-tests it, publishes it, and rolls it out
+# to the production server — in that order, in one run. Nothing is built on
+# a push to main: main takes ordinary work without side effects, and an
+# image exists only because a release was cut.
 #
-# workflow_dispatch from a tag re-deploys that tag (rollback).
+# workflow_dispatch from a tag re-runs that release (rollback). The build is
+# reproducible from the tagged tree, so it produces the same image.
 #
 # The frontend at app.klartex.se is not deployed here. ~/app is fed from
 # app/dist, and the source that builds it lives on the unmerged #14 branch
@@ -29,19 +29,30 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy to production
+  build:
+    name: Build and publish image
     # Tag guard: the dispatch UI preselects the default branch, and an
-    # untagged main build must never reach production.
+    # untagged build must never reach production.
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      # The tag names the version; pyproject.toml is what /health reports and
-      # what backend.yml tagged the image with. A mismatch would deploy an
-      # image whose reported version disagrees with the release.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # CI already ran these on the pull request. Running them again here
+      # binds the tested tree to the published image: a tag can point at any
+      # commit, including one that never went through a PR.
+      - name: Run tests
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+          pytest -q
+
       - name: Resolve version
         id: version
         run: |
@@ -53,15 +64,83 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # Fail before touching the server if the image was never built — the
-      # tag may point at a commit that never landed on main.
-      - name: Verify image exists in GHCR
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # amd64 first, loaded into the runner so it can actually be run before
+      # anything is pushed. This is what catches a missing LaTeX package or a
+      # broken PATH — failures a successful `docker build` does not reveal.
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          load: true
+          tags: smoke-test:amd64
+
+      - name: Smoke-test (render a minimal block-engine PDF)
         run: |
-          image="ghcr.io/swedev/klartex-se-backend:${{ steps.version.outputs.version }}"
-          docker buildx imagetools inspect "$image" > /dev/null || {
-            echo "$image not found — push the commit to main first so backend.yml builds it" >&2
+          docker run -d --name smoke -p 18000:8000 smoke-test:amd64
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:18000/health >/dev/null 2>&1; then
+              echo "✓ /health up after ${i}s"; break
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:18000/health
+          code=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
+            -X POST http://localhost:18000/render \
+            -H "Content-Type: application/json" \
+            -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
+          echo "render HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "--- backend logs ---"; docker logs smoke
+            echo "--- response ---"; cat /tmp/out.pdf
             exit 1
+          fi
+          head -c 4 /tmp/out.pdf | grep -q '%PDF' || {
+            echo "Response is not a PDF"; head -c 200 /tmp/out.pdf; exit 1;
           }
+          echo "✓ render produced $(stat -c%s /tmp/out.pdf) bytes of PDF"
+          docker stop smoke
+
+      # Only after the smoke test passes does anything reach the registry.
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/swedev/klartex-se-backend:${{ steps.version.outputs.version }}
+            ghcr.io/swedev/klartex-se-backend:latest
+
+  deploy:
+    name: Deploy to production
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Re-resolved here because jobs do not share step outputs implicitly.
+      # The build job already failed the run if the tag and pyproject.toml
+      # disagreed, so this cannot diverge from what was published.
+      - name: Resolve version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pyproject=$(python3 -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          if [[ "$version" != "$pyproject" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match backend/pyproject.toml version $pyproject" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # The host key is pinned via the SSH_KNOWN_HOSTS secret rather than
       # trusting whatever ssh-keyscan returns at deploy time. To rotate
