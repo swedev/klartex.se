@@ -1,6 +1,6 @@
 # MVP-plan för klartex.se
 
-Mål: en webbapp som klarar **Bob-testet** — en 65-årig styrelseledamot ska kunna öppna klartex.se, klicka "Kallelse till årsmöte", redigera texten direkt i sidan och ladda ner en PDF. Utan att se LaTeX, utan att öppna terminal, utan att prata med en chattbot.
+Mål: en webbapp som klarar **styrelsetestet** — en 65-årig styrelseledamot ska kunna öppna klartex.se, klicka "Kallelse till årsmöte", redigera texten direkt i sidan och ladda ner en PDF. Utan att se LaTeX, utan att öppna terminal, utan att prata med en chattbot.
 
 Definitionen kommer från `../projects/klartex/wysiwyg.md`. Det här dokumentet bryter ner den i faser.
 
@@ -89,7 +89,7 @@ Slutsats för framtida bygg: börja brett, inte smalt.
 
 Allt nedan måste vara sant innan vi annonserar publikt:
 
-- [ ] Bob-testet går: en ny styrelseledamot lyckas, utan handledning, producera en kallelse på 10 minuter.
+- [ ] Styrelsetestet går: en ny styrelseledamot lyckas, utan handledning, producera en kallelse på 10 minuter.
 - [ ] Minst tre olika dokumenttyper (kallelse, protokoll, motion) renderar korrekt med en organisations egen branding.
 - [ ] En andra organisation har satt upp sin branding via branding-vyn.
 - [ ] Inga obegripliga LaTeX-felmeddelanden visas för slutanvändaren.
