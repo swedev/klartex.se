@@ -1,5 +1,5 @@
 # klartex.se production Caddy config.
-# Three vhosts share automatic Let's Encrypt TLS.
+# Two vhosts share automatic Let's Encrypt TLS.
 
 {
     email matte@insector.se
@@ -22,49 +22,31 @@ klartex.se, www.klartex.se {
     redir @www https://klartex.se{uri} permanent
 }
 
-# 2. Webapp — Vite-built static bundle.
+# 2. Webapp and API — one origin. Vite-built static bundle, with the whole
+#    /api namespace proxied to the backend container.
 app.klartex.se {
-    root * /srv/app
     encode zstd gzip
-    try_files {path} /index.html   # SPA fallback
-    file_server
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options    "nosniff"
         Referrer-Policy           "strict-origin-when-cross-origin"
-        # Tiptap + future API calls
-        Content-Security-Policy   "default-src 'self'; connect-src 'self' https://api.klartex.se; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+        # Tiptap + API calls, all same-origin.
+        Content-Security-Policy   "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
-}
 
-# 3. API — proxied to klartex container on loopback.
-api.klartex.se {
-    encode zstd gzip
-    @cors_preflight method OPTIONS
-    handle @cors_preflight {
-        header {
-            Access-Control-Allow-Origin  "https://app.klartex.se"
-            Access-Control-Allow-Methods "GET, POST, OPTIONS"
-            Access-Control-Allow-Headers "Content-Type, Authorization"
-            Access-Control-Max-Age       "86400"
-        }
-        respond 204
-    }
-    header {
-        Access-Control-Allow-Origin "https://app.klartex.se"
-        Vary                        "Origin"
-        Strict-Transport-Security   "max-age=31536000; includeSubDomains"
-    }
+    # Bare /api is matched alongside /api/*, so nothing in the namespace
+    # falls through to the SPA.
+    @api path /api /api/*
 
     @render {
         method POST
-        path /render
+        path /api/render
     }
 
     # Cap the render body before FastAPI parses it: the backend reads and
     # validates the whole JSON body before its concurrency semaphore is
     # reached. Caddy cuts the body off at the limit and answers 413.
-    # /page-templates uploads carry fonts and are deliberately excluded.
+    # /api/page-templates uploads carry fonts and are deliberately excluded.
     request_body @render {
         max_size 2MB
     }
@@ -77,7 +59,7 @@ api.klartex.se {
         zone render_per_ip {
             match {
                 method POST
-                path /render
+                path /api/render
             }
             key         {client_ip}
             events      10
@@ -86,12 +68,20 @@ api.klartex.se {
         }
     }
 
-    reverse_proxy backend:8000 {
-        # PDF responses can be a few MB; keep timeouts generous. A render
-        # is two xelatex runs of up to 60s each, so the proxy must wait
-        # longer than the worst legitimate case.
-        transport http {
-            response_header_timeout 150s
+    handle @api {
+        reverse_proxy backend:8000 {
+            # PDF responses can be a few MB; keep timeouts generous. A render
+            # is two xelatex runs of up to 60s each, so the proxy must wait
+            # longer than the worst legitimate case.
+            transport http {
+                response_header_timeout 150s
+            }
         }
+    }
+
+    handle {
+        root * /srv/app
+        try_files {path} /index.html   # SPA fallback
+        file_server
     }
 }

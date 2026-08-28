@@ -23,7 +23,7 @@ Visionsdokumenten i `../projects/klartex/` är källan för designbeslut (`READM
 Kärnan (`../klartex/`) är ett **headless API**: in kommer JSON, ut kommer PDF. klartex.se ska inte duplicera den logiken. Webbappen ska:
 
 1. Anropa `klartex-se-backend` (`backend/` i detta repo, som importerar `klartex` som library) för all PDF-rendering — aldrig själv producera LaTeX.
-2. Använda kärnans schema-discovery (`/templates`, `/templates/<name>/schema`) som single source of truth för vilka block som finns och hur deras data ser ut.
+2. Använda kärnans schema-discovery (`/api/templates`, `/api/templates/<name>/schema`) som single source of truth för vilka block som finns och hur deras data ser ut.
 3. Serialisera editor-state till samma JSON som CLI:t använder. Rundresan **klartex-JSON → editor-state → klartex-JSON** ska vara förlustfri (se `../projects/klartex/wysiwyg.md`).
 
 Om webbappens behov tvingar fram förändringar i kärnan görs de i kärnan, inte parallellt här.

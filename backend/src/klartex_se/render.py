@@ -3,7 +3,7 @@
 Wraps `klartex.render()`. Supports three modes for the page template:
 
 1. `page_template: "vkf"` — name of a bundle registered via
-   /page-templates. Server loads its tex.jinja + asset_dir.
+   /api/page-templates. Server loads its tex.jinja + asset_dir.
 2. `page_template: "formal" | "clean" | "none"` — klartex built-in,
    passed through as data["page_template"].
 3. `page_template: null` — whichever default klartex picks
@@ -57,9 +57,9 @@ class RenderRequest(BaseModel):
     page_template: str | None = Field(
         None,
         description=(
-            "Either a registered bundle name (see /page-templates) or one of "
-            "the klartex built-ins: formal, clean, none. If null, klartex "
-            "picks its default."
+            "Either a registered bundle name (see /api/page-templates) or "
+            "one of the klartex built-ins: formal, clean, none. If null, "
+            "klartex picks its default."
         ),
         examples=["vkf", "formal"],
     )

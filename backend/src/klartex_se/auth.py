@@ -1,7 +1,7 @@
 """Admin-token verification for mutating endpoints.
 
-ADMIN_TOKEN env-var gates POST/DELETE on /page-templates. Public endpoints
-(GET, /render) are not affected.
+ADMIN_TOKEN env-var gates POST/DELETE on /api/page-templates. Public
+endpoints (GET, /api/render) are not affected.
 
 This is a stopgap until real auth + orgs land (fas 5). When that happens,
 this dependency is replaced by a session/JWT check.

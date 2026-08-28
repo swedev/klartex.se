@@ -92,14 +92,14 @@ jobs:
         run: |
           docker run -d --name smoke -p 18000:8000 smoke-test:amd64
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:18000/health >/dev/null 2>&1; then
-              echo "✓ /health up after ${i}s"; break
+            if curl -fsS http://localhost:18000/api/health >/dev/null 2>&1; then
+              echo "✓ /api/health up after ${i}s"; break
             fi
             sleep 1
           done
-          curl -fsS http://localhost:18000/health
+          curl -fsS http://localhost:18000/api/health
           code=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
-            -X POST http://localhost:18000/render \
+            -X POST http://localhost:18000/api/render \
             -H "Content-Type: application/json" \
             -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
           echo "render HTTP $code"
@@ -283,7 +283,7 @@ jobs:
           # The version the API actually reports has to match what was
           # deployed — a stale container would otherwise pass the checks above.
           for i in 1 2 3 4 5 6; do
-              reported="$(curl -fsS http://127.0.0.1:8000/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+              reported="$(curl -fsS http://127.0.0.1:8000/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
               if [[ "$reported" == "$VERSION" ]]; then
                   echo "health check: OK ($reported)"
                   trap - ERR
@@ -291,7 +291,7 @@ jobs:
               fi
               sleep 5
           done
-          echo "health check FAILED — /health reports '${reported:-nothing}', expected '$VERSION'" >&2
+          echo "health check FAILED — /api/health reports '${reported:-nothing}', expected '$VERSION'" >&2
           false
           REMOTE
 

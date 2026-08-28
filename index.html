@@ -75,8 +75,8 @@ echo '{ "body": [...] }' | klartex
 # Show the JSON Schema for a template
 klartex schema faktura</code></pre>
 
-<p>The same rendering is available over HTTP at <a href="https://api.klartex.se">api.klartex.se</a>:</p>
-<pre><code>curl -X POST https://api.klartex.se/render \
+<p>The same rendering is available over HTTP at <a href="https://app.klartex.se/api">app.klartex.se/api</a>:</p>
+<pre><code>curl -X POST https://app.klartex.se/api/render \
   -H 'Content-Type: application/json' \
   -d '{"template":"faktura","data":{...}}' \
   -o invoice.pdf</code></pre>

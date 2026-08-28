@@ -34,7 +34,7 @@ def test_render_minimal_block_doc():
             ],
         },
     }
-    r = client.post("/render", json=body)
+    r = client.post("/api/render", json=body)
     assert r.status_code == 200, r.text
     assert r.headers["content-type"] == "application/pdf"
     assert r.content[:4] == b"%PDF"
@@ -45,7 +45,7 @@ def test_render_validation_error_returns_structured_400():
         "template": "_block",
         "data": {"body": [{"type": "heading"}]},  # missing required `text`
     }
-    r = client.post("/render", json=body)
+    r = client.post("/api/render", json=body)
     assert r.status_code == 400
     detail = r.json()["detail"]
     # klartex.render() wraps both unknown-template and schema-validation
@@ -71,7 +71,7 @@ def test_render_block_error_message_carries_body_index():
             ]
         },
     }
-    r = client.post("/render", json=body)
+    r = client.post("/api/render", json=body)
     assert r.status_code == 400
     detail = r.json()["detail"]
     assert detail["type"] == "input_error"
@@ -79,13 +79,13 @@ def test_render_block_error_message_carries_body_index():
     assert "path" not in detail
 
     body["data"]["body"] = [{"type": "text"}]
-    r = client.post("/render", json=body)
+    r = client.post("/api/render", json=body)
     assert r.status_code == 400
     assert "body[0]" in r.json()["detail"]["message"]
 
 
 def test_render_unknown_template_returns_400():
-    r = client.post("/render", json={"template": "nope", "data": {}})
+    r = client.post("/api/render", json={"template": "nope", "data": {}})
     assert r.status_code == 400
     assert r.json()["detail"]["type"] == "input_error"
 
@@ -93,7 +93,7 @@ def test_render_unknown_template_returns_400():
 def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch):
     monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
     r = client.post(
-        "/render",
+        "/api/render",
         json={
             "template": "_block",
             "data": {"body": [{"type": "heading", "text": "x"}]},
@@ -110,7 +110,7 @@ def test_render_builtin_page_template_passes_through(tmp_path, monkeypatch):
     # No bundle named "formal" exists; should NOT 400. With xelatex absent
     # we expect a render_error 500 (or success if xelatex present).
     r = client.post(
-        "/render",
+        "/api/render",
         json={
             "template": "_block",
             "data": {"body": [{"type": "heading", "text": "x"}]},
@@ -162,7 +162,7 @@ def test_render_returns_503_when_all_slots_taken(render_slots):
     for _ in range(render_module.MAX_CONCURRENT_RENDERS):
         assert render_slots.acquire(blocking=False)
 
-    r = client.post("/render", json=MINIMAL_BODY)
+    r = client.post("/api/render", json=MINIMAL_BODY)
 
     assert r.status_code == 503
     assert r.headers["Retry-After"] == "5"
@@ -174,7 +174,7 @@ def test_render_releases_slot_after_success(render_slots, monkeypatch):
         render_module, "klartex_render", lambda *a, **kw: b"%PDF-fake"
     )
 
-    r = client.post("/render", json=MINIMAL_BODY)
+    r = client.post("/api/render", json=MINIMAL_BODY)
 
     assert r.status_code == 200
     assert_all_slots_free(render_slots)
@@ -186,7 +186,7 @@ def test_render_releases_slot_after_failure(render_slots, monkeypatch):
 
     monkeypatch.setattr(render_module, "klartex_render", boom)
 
-    r = client.post("/render", json=MINIMAL_BODY)
+    r = client.post("/api/render", json=MINIMAL_BODY)
 
     assert r.status_code == 500
     assert r.json()["detail"]["type"] == "render_error"
@@ -208,7 +208,7 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
     results: dict[int, int] = {}
 
     def run(index):
-        results[index] = client.post("/render", json=MINIMAL_BODY).status_code
+        results[index] = client.post("/api/render", json=MINIMAL_BODY).status_code
 
     threads = [
         threading.Thread(target=run, args=(i, ), daemon=True)
@@ -220,7 +220,7 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
         for _ in threads:
             assert in_render.acquire(timeout=10), "renders never started"
 
-        r = client.post("/render", json=MINIMAL_BODY)
+        r = client.post("/api/render", json=MINIMAL_BODY)
         assert r.status_code == 503
         assert r.json()["detail"]["type"] == "overloaded"
     finally:
@@ -231,3 +231,13 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
     assert not any(t.is_alive() for t in threads)
     assert sorted(results.values()) == [200] * len(threads)
     assert_all_slots_free(render_slots)
+
+
+def test_every_route_lives_under_api():
+    """No route may escape the /api namespace — Caddy proxies only /api/*."""
+    outside = sorted(
+        route.path
+        for route in app.routes
+        if getattr(route, "path", "").startswith("/") and not route.path.startswith("/api")
+    )
+    assert outside == [], f"routes outside /api: {outside}"

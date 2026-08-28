@@ -83,7 +83,6 @@ Next steps:
        klartex.se      A   $IP
        www.klartex.se  A   $IP
        app.klartex.se  A   $IP
-       api.klartex.se  A   $IP
 
   2. Wait ~2 min for cloud-init to finish, then verify:
        ssh klartex@$IP "cloud-init status --wait && docker --version"

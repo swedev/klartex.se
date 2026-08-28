@@ -30,7 +30,7 @@ Faserna beskriver ordningen arbetet är tänkt att växa i, inte en tidsplan. Va
 
 **Fas 1 — Minimal Tiptap end-to-end.** Bevisa hela kedjan Tiptap-editor → klartex-JSON → PDF med minsta möjliga block-set, utan formulär-mellansteg. Backend-delen är klar; frontenden är #14.
 
-**Fas 2 — Custom block-typer.** Från fritt skrivande till klartex-block med eget JSON-schema. Block-formulär autogenereras från `/templates/_block/schema` — ingen hårdkodning per block. Rundresan Tiptap-state → klartex-JSON → Tiptap-state ska vara förlustfri mot kärnans fixtures; det är ett krav, inte en ambition.
+**Fas 2 — Custom block-typer.** Från fritt skrivande till klartex-block med eget JSON-schema. Block-formulär autogenereras från `/api/templates/_block/schema` — ingen hårdkodning per block. Rundresan Tiptap-state → klartex-JSON → Tiptap-state ska vara förlustfri mot kärnans fixtures; det är ett krav, inte en ambition.
 
 **Fas 3 — Mallväljare + sidopanel.** Alla åtta mallar går att välja, var och en med en förifylld startstruktur. Mall-specifik metadata flyttas till en sidopanel genererad från mallens schema. Distinktionen mellan recipe-mallar och block engine hålls dold för användaren.
 
@@ -52,7 +52,7 @@ Faserna beskriver ordningen arbetet är tänkt att växa i, inte en tidsplan. Va
 | **Bygge och deploy** | `v*`-tagg kör `.github/workflows/deploy.yml`: test → bygge → smoke-test → publicering → utrullning | En push till `main` bygger ingenting; `ci.yml` kör testerna. Basimagen byggs och publiceras från `swedev/klartex`. |
 | **Page-template-registry** | Filbaserad (`~klartex/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn | Writes kräver `ADMIN_TOKEN`. Per-org-auth kommer med #19. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | Bryts ut till eget repo om scopet växer. |
-| **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp, `api.klartex.se` = `backend/` i detta repo | DNS hos Loopia, servern i Hetzner. HTTP-ytan togs bort ur kärnan i `v0.11.0`. |
+| **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp och API i ett ursprung: `backend/` i detta repo servas under `/api` | DNS hos Loopia, servern i Hetzner. Ett ursprung betyder ingen CORS. HTTP-ytan togs bort ur kärnan i `v0.11.0`. |
 | **Frontend-stack** | React 19 + TypeScript + Vite 6 + Tailwind 4 + Radix Themes + Tiptap | Beslutad i #14, med `~/repos/openvera/frontend` som referens. |
 | **Auth** | parla — device flow, scopes, rotation, revokering | Beslutad i #19. Clerk och Supabase Auth är avförda. Förutsätter Postgres och konton i backenden, som är samma issues första lager. |
 
@@ -81,7 +81,7 @@ Slutsats för framtida bygg: börja brett, inte smalt.
 |------|-----------|
 | Tiptap ↔ klartex-JSON-rundresan blir lossy (inline-formatering, kapslade block) | Fas 2 har testsvit mot kärnans fixtures. Om förlustfrihet inte går: kör Tiptap som rendering-only och behåll JSON som källan — osmidigt UX, men det funkar. |
 | XeLaTeX-fel som är obegripliga för slutanvändare | Fas 6 har felöversättning. Kärnan exponerar redan strukturerade valideringsfel — det räcker långt. |
-| `/render` kör anropar-styrd LaTeX på en delad VM | Rate limit och resurstak finns (#20). Filläsning under kompilering är däremot öppen: TeX Live 2026 tillämpar inte längre `openin_any`, så skyddet måste bli process- eller OS-isolering i kärnan (`swedev/klartex#51`). Tills dess bör `latex`-blocket inte nås anonymt (#23). |
+| `/api/render` kör anropar-styrd LaTeX på en delad VM | Rate limit och resurstak finns (#20). Filläsning under kompilering är däremot öppen: TeX Live 2026 tillämpar inte längre `openin_any`, så skyddet måste bli process- eller OS-isolering i kärnan (`swedev/klartex#51`). Tills dess bör `latex`-blocket inte nås anonymt (#23). |
 | Branding-fragment-formatet ändras i kärnan | Branding-vyn ska bara generera fragment via kärnans schema, inte handgissa LaTeX. Ändras formatet, ändras genereringen — inte alla sparade brandings. |
 | Dokumentlagring (fas 5) växer till en filregister-design som inte är genomtänkt | Håll persistent storage minimal: bara `document_id → klartex_json`. Filregister-skissen i `filregister.md` aktiveras senare. |
 

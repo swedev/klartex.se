@@ -8,8 +8,8 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 |-----|------|
 | `provision.sh` | Skapar Hetzner-firewall + server från scratch. Idempotent. |
 | `cloud-init.yaml` | Körs en gång vid första boot: installerar Docker, sätter upp användare, brandvägg, systemd-unit. |
-| `docker-compose.yml` | Stackdefinition: Caddy + klartex-API. Deployas till `~/klartex/` på servern. |
-| `Caddyfile` | TLS + tre vhosts: `klartex.se`, `app.klartex.se`, `api.klartex.se`. Rate limit + body-gräns på `POST /render`. |
+| `docker-compose.yml` | Stackdefinition: Caddy + klartex-backend. Deployas till `~/klartex/` på servern. |
+| `Caddyfile` | TLS + två vhosts: `klartex.se` och `app.klartex.se`, som servar både webbappen och `/api`. Rate limit + body-gräns på `POST /api/render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
 | `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION`. |
 | `../.github/workflows/deploy.yml` | Deployar vid en `v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, restartar. |
@@ -23,7 +23,7 @@ Förutsätter att `hcloud` CLI är autentiserad och SSH-nyckeln uppladdad (se kl
 ./infra/provision.sh
 
 # 2. Vänta ~2 min, peka DNS mot returnerad IP
-#    klartex.se / www / app / api  →  A-record
+#    klartex.se / www / app  →  A-record
 
 # 3. Lägg env-filen på servern. Den görs en gång för hand och versionshanteras
 #    aldrig — den bär ADMIN_TOKEN. Deployen läser den, men rör aldrig annat än
@@ -40,9 +40,9 @@ git tag v0.2.3 && git push origin v0.2.3
 1. Bumpa `version` i `backend/pyproject.toml` och `__version__` i `backend/src/klartex_se/__init__.py`.
 2. Merga till `main`. Ingenting byggs — `ci.yml` kör bara testerna.
 3. Tagga samma version och pusha taggen: `git tag v0.2.4 && git push origin v0.2.4`. Taggen bygger imagen, smoke-testar den, publicerar den och deployar, i den ordningen.
-4. Verifiera: `curl -fsS https://api.klartex.se/health`.
+4. Verifiera: `curl -fsS https://app.klartex.se/api/health`.
 
-Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/health` rapporterar då skulle säga olika saker.
+Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/api/health` rapporterar då skulle säga olika saker.
 
 Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version och deployar den imagen. Alla version-taggar ligger kvar i GHCR.
 
@@ -58,9 +58,9 @@ Deploy-workflowen bygger imagen och kör preflight — `caddy list-modules` (mod
 
 Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka `image: caddy:2-alpine` i `docker-compose.yml` tillsammans med föregående Caddyfile, och deploya om. Certifikaten ligger i `./caddy-data` och påverkas inte.
 
-## Rate limit och storleksgräns på `/render`
+## Rate limit och storleksgräns på `/api/render`
 
-`POST /render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
+`POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
 
 Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), och backend-containern kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml` — anpassade till en cax11 (2 vCPU, 4 GB) så att OS och Caddy behåller marginal när backend är mättad.
 
