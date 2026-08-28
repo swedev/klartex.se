@@ -30,9 +30,20 @@ app.klartex.se {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options    "nosniff"
         Referrer-Policy           "strict-origin-when-cross-origin"
-        # Tiptap + API calls, all same-origin.
-        Content-Security-Policy   "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
+
+    # Two content policies, one per response. Swagger UI is
+    # framework-generated HTML: it pulls its stylesheet and bundle from
+    # jsdelivr, its favicon from fastapi.tiangolo.com, and boots from an
+    # inline script, so the docs pages need all four allowed. Nothing
+    # user-supplied is rendered there, and the relaxation reaches no other
+    # path. Everything else — the app bundle included — is same-origin only.
+    # The matchers must stay mutually exclusive: two header directives that
+    # set the same field do not override each other predictably.
+    @docs path /api/docs /api/docs/*
+    @notdocs not path /api/docs /api/docs/*
+    header @docs    Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data: blob: https://fastapi.tiangolo.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+    header @notdocs Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
 
     # Bare /api is matched alongside /api/*, so nothing in the namespace
     # falls through to the SPA.

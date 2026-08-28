@@ -5,7 +5,7 @@
 # Requires:
 #   - hcloud CLI authenticated (`hcloud context active` shows klartex)
 #   - SSH key already uploaded (`hcloud ssh-key list` shows it)
-#   - DNS for klartex.se / app / api pointing at the resulting IP (do this AFTER)
+#   - DNS for klartex.se / www / app pointing at the resulting IP (do this AFTER)
 
 set -euo pipefail
 
