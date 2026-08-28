@@ -100,6 +100,14 @@ Every recipe template accepts `page_template` in object form, the same shape the
 
 `faktura` and `kvitto` additionally take a top-level `footer` — the canonical place for payment details, taking precedence over the page template's footer — plus `sender` (an issuer block beside the recipient) and `logo` / `logo_height` / `logo_offset` in the header.
 
+## Change marking
+
+For documents that show what changed between two versions — the canonical case is amending statutes — mark edits inline using git word-diff notation. `{+added text+}` renders green, `[-removed text-]` red and struck through. The markers work in every field that passes through inline formatting, including table cells.
+
+Whole paragraphs take `revision` on the `text` block instead: `"revision": "added"` or `"revision": "removed"`.
+
+`page_template` accepts `diff_style`: `"color"` (default) marks additions in green text, `"underline"` marks them with a green underline. Removals are struck through either way. Underline-against-strikethrough is the convention in amendment documents and, unlike colour, survives black-and-white printing.
+
 ## Number formatting
 
 Amounts and quantities render in Swedish style by default (`32 400,00` — thin-space grouping, decimal comma). The document language picks the style; `number_format` (`sv` or `en`) in `faktura` / `kvitto` data overrides it.
