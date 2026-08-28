@@ -11,22 +11,24 @@
 - [x] Fas 1, steg 1: Skapa `backend/Dockerfile.base` med de tunga lagren (TeX Live-bas, apt-paket, mscorefonts, texlive-bin-symlänk, sanity-check)
 - [x] Fas 1, steg 2: Skapa `.github/workflows/backend-base.yml` (multi-arch build + push till `ghcr.io/swedev/klartex-se-base`)
 - [x] Fas 1, steg 3: Exkludera `backend/Dockerfile.base` ur `paths`-filtret i `.github/workflows/backend.yml`
-- [ ] Fas 1, steg 4: Efter merge — verifiera bastagg i GHCR, sätt paketsynlighet, notera tagg + manifest-digest
+- [x] Fas 1, steg 4: Efter merge — bastagg verifierad i GHCR, paketsynlighet publik, tagg + manifest-digest noterade i planen
 
 ### Fas 2: Slimmad app-Dockerfile och workflow-justering (PR 2)
 
-- [ ] Fas 2, steg 1: Skriv om `backend/Dockerfile` (`FROM <bastagg@digest>`, ta bort flyttade lager och oanvänd `COPY pyproject.toml`)
-- [ ] Fas 2, steg 2: Verifiera lokalt (docker build + render ur smoke-testet)
-- [ ] Fas 2, steg 3: Uppdatera `backend/README.md` (Docker- och Deploy-sektionerna)
-- [ ] Fas 2, steg 4: Uppdatera stale dok i `PLAN.md` och kommentaren i `.github/workflows/deploy.yml`
+- [x] Fas 2, steg 1: Skriv om `backend/Dockerfile` (`FROM <bastagg@digest>`, ta bort flyttade lager och oanvänd `COPY pyproject.toml`)
+- [ ] Fas 2, steg 2: Verifiera lokalt (docker build + render ur smoke-testet) — går inte i den här miljön, se Anteckningar
+- [x] Fas 2, steg 3: Uppdatera `backend/README.md` (Docker- och Deploy-sektionerna)
+- [x] Fas 2, steg 4: Uppdatera stale dok i `PLAN.md` och kommentaren i `.github/workflows/deploy.yml`
 - [ ] Fas 2, steg 5: Verifiera efter merge att release-bygget går på ett par minuter
 
 ## Pågående arbete
 
-Fas 1 (PR 1) är implementerad. Nästa steg är fas 1, steg 4 — verifiering efter merge: bastaggen måste finnas i GHCR med båda arkitekturerna, paketsynligheten sättas, och tagg + manifest-digest noteras. Fas 2 påbörjas därefter i en egen PR.
+Fas 2 är implementerad på branchen `issue/32-ci-texlive-base-image`: `backend/Dockerfile` är slimmad till `FROM ghcr.io/swedev/klartex-se-base:20260828-1@sha256:640992…` plus venv och `COPY src/`, `backend/README.md` beskriver bas-/app-uppdelningen och bump-proceduren, `PLAN.md`:s **API-image**-rad och huvudkommentaren i `.github/workflows/deploy.yml` är uppdaterade. Kvar: lokal docker-verifiering (steg 2) och efterkontroll av release-byggets tid (steg 5).
 
 ## Anteckningar
 
-Lokal verifiering av `Dockerfile.base` gjordes inte: docker-daemonen kör inte i den här miljön, och ett fullt basbygge är ~7 GB och ~15–20 min per arkitektur. Lagren är flyttade oförändrade från `backend/Dockerfile`, som bygger grönt idag; det nya är sanity-check-lagret, som körs av basworkflown på båda arkitekturerna vid merge. `.github/workflows/backend-base.yml` och den ändrade `backend.yml` är validerade med `actionlint` (rent).
+Bastaggen är kontrollerad direkt mot GHCR:s registry-API i stället för `docker buildx imagetools inspect` (ingen docker-daemon här): `ghcr.io/swedev/klartex-se-base:20260828-1` svarar `200` för en anonym pull-token, manifest-digesten är `sha256:640992b132b9880eb0f801b81ac5f30ea64190243fa8900fbfda098cb158562b` — samma som `FROM`-pinnen — och indexet listar `linux/amd64` och `linux/arm64`. Anonym token bekräftar också att paketet är publikt.
 
-Utrullningen sker i två PR:er (designbeslut 2 i planen). Fas 2 kan inte påbörjas förrän PR 1 är mergad och basworkflown publicerat en tagg i GHCR — app-Dockerfilens `FROM`-rad måste pinna en tagg + manifest-digest som faktiskt existerar. Denna körning omfattar därför fas 1.
+Fas 2, steg 2 (lokalt `docker build` + render ur smoke-testet) kunde inte köras: docker-daemonen kör inte i den här miljön. Skyddsnätet enligt planen gäller — `backend.yml` kör pytest, bygger amd64, startar containern och renderar en PDF innan någon image pushas, så en trasig bas ger röd CI i stället för en trasig release. Samma steg täcker även checklistans punkt om kontrollerad lager-invalidering, som kräver två lokala byggen.
+
+`actionlint` på `.github/workflows/deploy.yml` rapporterar en SC2086-info på rad 93 — den finns redan på `main` och rör inte kommentarsändringen. `backend.yml` och `backend-base.yml` är rena.

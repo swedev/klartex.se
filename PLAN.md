@@ -48,7 +48,7 @@ Faserna beskriver ordningen arbetet är tänkt att växa i, inte en tidsplan. Va
 |--------|-----|-----------|
 | **Hosting (API + frontend)** | Hetzner Cloud `cax11` (ARM, nbg1), Ubuntu 24.04, Docker Compose | Egen VM ger XeLaTeX out-of-the-box och billigare än Fly.io. Inte Cloudflare Pages — Caddy serverar redan statiska filer. |
 | **Reverse proxy / TLS** | Caddy 2 med automatisk Let's Encrypt, byggd med rate limit-modulen | `Caddyfile` och `caddy/Dockerfile` i `infra/`. Tre vhosts. |
-| **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, `texlive/texlive:latest`-bas + mscorefonts) | Pinnad version i serverns `.env`, aldrig `:latest` i prod. CI smoke-testar amd64-bygget innan multi-arch-push. |
+| **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, byggd på basimagen `ghcr.io/swedev/klartex-se-base` med TeX Live + mscorefonts) | Pinnad version i serverns `.env`, aldrig `:latest` i prod. Basen pinnas med tagg + digest i `backend/Dockerfile` och bumpas i egen PR. CI smoke-testar amd64-bygget innan multi-arch-push. |
 | **Deploy** | `v*`-tagg kör `.github/workflows/deploy.yml` | Bygget sker i `backend.yml` vid merge till `main`; taggen rullar ut den image som redan finns i GHCR. |
 | **Page-template-registry** | Filbaserad (`~klartex/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn | Writes kräver `ADMIN_TOKEN`. Per-org-auth kommer med #19. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | Bryts ut till eget repo om scopet växer. |

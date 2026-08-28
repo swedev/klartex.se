@@ -21,10 +21,10 @@ Sluta bygga om den ~7 GB stora TeX Live-imagen vid varje release. De tunga, säl
 
 ### Triagemässiga noteringar
 
-Inga blockerande issues. Kräver dock en **tvåstegs-utrullning** (två PR:er) eftersom basimagen måste finnas i GHCR innan app-Dockerfilen som pekar på den kan byggas — se designbeslut 2. `deploy.yml` behöver inga logikändringar (verifierat: den verifierar bara att imagen finns i GHCR och rullar ut den; den bygger aldrig) — bara en stale kommentar rättas.
+Inga blockerande issues. Utrullningen är en **tvåstegs-utrullning** (två PR:er) eftersom basimagen måste finnas i GHCR innan app-Dockerfilen som pekar på den kan byggas — se designbeslut 2. **Fas 1 är klar:** PR #35 mergades 2026-08-28 och basworkflown publicerade `ghcr.io/swedev/klartex-se-base:20260828-1` (amd64 + arm64). Återstår fas 2. `deploy.yml` behöver inga logikändringar (verifierat: den verifierar bara att imagen finns i GHCR och rullar ut den; den bygger aldrig) — bara en stale kommentar rättas.
 
-Operativa förutsättningar (inte kodblockerare, men gates för fas 2):
-- Basworkflown behöver `packages: write` och skapar GHCR-paketet `klartex-se-base` vid första push; paket skapade via `GITHUB_TOKEN` länkas automatiskt till repot men blir **privata** — en paket-/repo-admin måste sätta synligheten (engångsåtgärd).
+Operativa förutsättningar:
+- GHCR-paketet `klartex-se-base` är skapat och **publikt** (samma synlighet som `klartex-se-backend`) — gaten för fas 2 är uppfylld; lokala byggen av app-imagen fungerar utan ghcr-login.
 - Publicerade bastaggar som refereras av någon app-Dockerfile i historiken får inte raderas — då går de byggena inte att reproducera.
 
 ## Angreppssätt
@@ -42,7 +42,7 @@ Basimagen pinnas explicit i app-Dockerfilens `FROM`-rad (tagg + manifest-digest)
 
 ## Steg
 
-### Fas 1: Basimage och basworkflow (PR 1)
+### Fas 1: Basimage och basworkflow (PR 1 — klar, mergad som #35)
 
 1. Skapa `backend/Dockerfile.base` med de tunga, sällan ändrade lagren, flyttade oförändrade från nuvarande `backend/Dockerfile` (inklusive kommentarerna som förklarar dem):
    - `FROM texlive/texlive:latest`
@@ -60,15 +60,15 @@ Basimagen pinnas explicit i app-Dockerfilens `FROM`-rad (tagg + manifest-digest)
    - Filer att ändra: `.github/workflows/backend-base.yml` (ny)
 3. Lägg till `- '!backend/Dockerfile.base'` i `paths`-filtret i `.github/workflows/backend.yml` redan i denna PR, så att framtida bas-ändringar inte triggar meningslösa app-byggen. Obs: PR 1-mergen i sig triggar ändå ett sista fullbygge av app-imagen — PR:en ändrar `.github/workflows/backend.yml`, som är en egen positiv path-match. Det är förväntat och ofarligt (bygger nuvarande Dockerfile som förut)
    - Filer att ändra: `.github/workflows/backend.yml`
-4. Efter merge av PR 1:
-   - Verifiera att workflown kört klart och att `ghcr.io/swedev/klartex-se-base:<tagg>` finns (`docker buildx imagetools inspect`), med båda arkitekturerna
-   - Engångsåtgärd i GHCR-UI:t (kräver paket-/repo-admin): sätt paketets synlighet så den matchar `klartex-se-backend` (nya paket skapas privata; publik bas gör att lokala byggen fungerar utan ghcr-login)
-   - Notera taggen **och manifest-digesten** (ur `imagetools inspect`) — båda pinnas i fas 2
+4. Efter merge av PR 1 — genomfört, med resultat:
+   - Basworkflown körde grönt på merge-committen; `docker buildx imagetools inspect` bekräftar att `ghcr.io/swedev/klartex-se-base:20260828-1` finns med både `linux/amd64` och `linux/arm64`
+   - Paketet `klartex-se-base` är **publikt** i GHCR (samma synlighet som `klartex-se-backend`)
+   - Pinne för fas 2: tagg `20260828-1`, manifest-digest `sha256:640992b132b9880eb0f801b81ac5f30ea64190243fa8900fbfda098cb158562b`
 
 ### Fas 2: Slimmad app-Dockerfile och workflow-justering (PR 2)
 
 1. Skriv om `backend/Dockerfile`:
-   - `FROM ghcr.io/swedev/klartex-se-base:<tagg>@sha256:<digest>` — tagg för läsbarhet, digest för äkta immutabilitet (från fas 1)
+   - `FROM ghcr.io/swedev/klartex-se-base:20260828-1@sha256:640992b132b9880eb0f801b81ac5f30ea64190243fa8900fbfda098cb158562b` — tagg för läsbarhet, digest för äkta immutabilitet (publicerad i fas 1)
    - Ta bort de lager som flyttat till basen
    - Ta bort `COPY pyproject.toml ./` (används inte av install-steget)
    - Behåll: `WORKDIR /app`, venv-skapande + pip-install av den pinnade listan, `COPY src/ ./src/`, `ENV PATH/PYTHONPATH/PYTHONUNBUFFERED`, `EXPOSE`, `HEALTHCHECK`, `CMD`
@@ -90,9 +90,9 @@ Basimagen pinnas explicit i app-Dockerfilens `FROM`-rad (tagg + manifest-digest)
 
 | Fil | Åtgärd | Syfte |
 |-----|--------|-------|
-| `backend/Dockerfile.base` | Skapa (PR 1) | Tunga, sällan ändrade lager: TeX Live-bas, apt-paket, mscorefonts, texlive-bin-symlänk, sanity-check |
-| `.github/workflows/backend-base.yml` | Skapa (PR 1) | Bygger + pushar multi-arch basimage till `ghcr.io/swedev/klartex-se-base`; triggar bara på basfilens/egna workflowns ändringar |
-| `.github/workflows/backend.yml` | Ändra (PR 1) | Exkludera `Dockerfile.base` ur `paths`-filtret; i övrigt oförändrat flöde |
+| `backend/Dockerfile.base` | Skapa (PR 1 — klar) | Tunga, sällan ändrade lager: TeX Live-bas, apt-paket, mscorefonts, texlive-bin-symlänk, sanity-check |
+| `.github/workflows/backend-base.yml` | Skapa (PR 1 — klar) | Bygger + pushar multi-arch basimage till `ghcr.io/swedev/klartex-se-base`; triggar bara på basfilens/egna workflowns ändringar |
+| `.github/workflows/backend.yml` | Ändra (PR 1 — klar) | Exkludera `Dockerfile.base` ur `paths`-filtret; i övrigt oförändrat flöde |
 | `backend/Dockerfile` | Ändra (PR 2) | `FROM` pinnad basimage; ta bort flyttade lager och oanvänd `COPY pyproject.toml` |
 | `backend/README.md` | Ändra (PR 2) | Dokumentera bas-/app-uppdelningen och bump-proceduren |
 | `PLAN.md` | Ändra (PR 2) | Uppdatera stale **API-image**-raden i "Tagna beslut" |
@@ -130,12 +130,12 @@ Lista de primära kataloger/områden som planen berör (för konfliktdetektering
 
 ## Verifieringschecklista
 
-- [ ] `backend-base.yml` bygger och pushar `ghcr.io/swedev/klartex-se-base` (amd64 + arm64) — och triggar *inte* på vanliga `backend/**`-ändringar
-- [ ] Sanity-check-lagret i `Dockerfile.base` kör och passerar på båda plattformarna (xelatex, fontspec, Georgia/Arial)
-- [ ] GHCR-paketet `klartex-se-base` har samma synlighet som `klartex-se-backend`
-- [ ] `backend/Dockerfile` pinnar basimagen med tagg **och** manifest-digest (`<tagg>@sha256:<digest>`) — aldrig en rörlig referens
+- [x] `backend-base.yml` bygger och pushar `ghcr.io/swedev/klartex-se-base` (amd64 + arm64) — och triggar *inte* på vanliga `backend/**`-ändringar (`paths`-filtret listar bara `Dockerfile.base` och workflown själv); verifierat med `imagetools inspect` av `20260828-1`
+- [x] Sanity-check-lagret i `Dockerfile.base` kör och passerar på båda plattformarna (xelatex, fontspec, Georgia/Arial) — basbygget gick grönt på båda arkitekturerna
+- [x] GHCR-paketet `klartex-se-base` har samma synlighet som `klartex-se-backend` (båda publika)
+- [x] `backend/Dockerfile` pinnar basimagen med tagg **och** manifest-digest (`<tagg>@sha256:<digest>`) — aldrig en rörlig referens; digesten kontrollerad mot GHCR-manifestet för `20260828-1`
 - [ ] Lager-invalidering verifierad kontrollerat: två lokala byggen med samma cache där enbart `backend/pyproject.toml` ändrats emellan visar `CACHED` på venv-`RUN`-steget (vid en riktig release ändras även `src/`, så `COPY src/` är då första invaliderade lagret)
 - [ ] Release-bygget i `backend.yml` går på ett par minuter i stället för ~15
 - [ ] Smoke-testet renderar en PDF genom hela stacken (fångar saknade TeX-paket även från basen)
 - [ ] En ändring i enbart `backend/Dockerfile.base` triggar basworkflown men inte `backend.yml`
-- [ ] `deploy.yml` logiskt orörd (endast kommentaren uppdaterad); en tagg-deploy verifierar imagen och rullar ut som förut
+- [x] `deploy.yml` logiskt orörd (endast kommentaren uppdaterad); en tagg-deploy verifierar imagen och rullar ut som förut
