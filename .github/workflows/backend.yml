@@ -8,6 +8,11 @@ on:
       # The base image is built by backend-base.yml. An app build on top
       # of an unchanged FROM pin would produce byte-identical layers.
       - '!backend/Dockerfile.base'
+      # Only COPY src/ puts repository content into the image, so prose
+      # cannot change it. Building anyway costs eight minutes and moves
+      # the version tag in GHCR to a rebuilt image. Tests stay in scope:
+      # pytest runs here before anything is built.
+      - '!backend/**.md'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
     inputs:
