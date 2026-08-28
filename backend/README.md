@@ -84,6 +84,6 @@ Pinnen bär både tagg och digest: taggen för läsbarhet, digesten för att byg
 
 ## Deploy
 
-Bygg + push av app-imagen sker via `.github/workflows/backend.yml` på varje merge till `main` som rör `backend/` (utom `Dockerfile.base`, som i stället triggar basworkflown). Bygger multi-arch (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`.
+App-imagen byggs av `.github/workflows/deploy.yml`, och bara när en `v*`-tagg pushas: tester, multi-arch-bygge (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`, smoke-test av amd64-imagen innan något publiceras, och därefter utrullning. En push till `main` bygger ingenting — `ci.yml` kör testerna och inget mer.
 
-För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, vänta på workflow, och pusha en matchande `v*`-tagg — den deployar via `.github/workflows/deploy.yml`.
+För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, och pusha en matchande `v*`-tagg.
