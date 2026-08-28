@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Klartex — PDF generation via LaTeX</title>
-  <meta name="description" content="Open-source CLI tool and Python library that generates professional PDF documents from JSON data via XeLaTeX.">
+  <title>Klartex — PDF från strukturerad data</title>
+  <meta name="description" content="Skicka JSON, få en färdig PDF. Öppet API på app.klartex.se/api, plus ett Python-paket och CLI för den som vill köra renderingen själv.">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -43,77 +43,67 @@
 </head>
 <body>
 
-<h1>Klartex</h1>
-<p class="tagline">PDF generation via LaTeX &mdash; structured data in, professional documents out.</p>
+  <h1>Klartex</h1>
+  <p class="tagline">Skicka strukturerad data, få ett färdigt dokument. Kallelser, protokoll, fakturor och årsredovisningar som PDF.</p>
 
-<p>Klartex is an open-source CLI tool and Python library that generates professional PDF documents from JSON data. It uses XeLaTeX under the hood.</p>
+  <p>Renderingen finns som ett öppet HTTP-API. Det här anropet fungerar som det står, utan installation och utan konto:</p>
 
-<h2>Install</h2>
-<pre><code>pip install klartex</code></pre>
-<p>Requires Python &ge; 3.12 and XeLaTeX (<code>brew install --cask mactex</code> or <code>apt install texlive-xetex</code>).</p>
-
-<h2>Templates</h2>
-<table class="templates-table">
-  <tr><th>Template</th><th>Description</th></tr>
-  <tr><td><code>_block</code></td><td>Universal block engine &mdash; compose documents freely from typed blocks</td></tr>
-  <tr><td><code>balansrakning</code></td><td>Balance sheet with assets and liabilities+equity sections</td></tr>
-  <tr><td><code>budgetrapport</code></td><td>Budget report with account codes, budgeted amounts, and actuals</td></tr>
-  <tr><td><code>faktura</code></td><td>Invoice with line items, VAT, and payment info</td></tr>
-  <tr><td><code>kvitto</code></td><td>Receipt with line items, total, and payment method</td></tr>
-  <tr><td><code>protokoll</code></td><td>Meeting minutes with agenda, decisions, and adjusters</td></tr>
-  <tr><td><code>resultatrakning</code></td><td>Income statement with comparison years and optional notes</td></tr>
-  <tr><td><code>sie-exportrapport</code></td><td>Human-readable PDF of SIE4 accounting data</td></tr>
-</table>
-
-<h2>Usage</h2>
-<pre><code># Generate a PDF from JSON data
-klartex -t faktura -d invoice.json
-
-# Pipe JSON via stdin (defaults to block engine)
-echo '{ "body": [...] }' | klartex
-
-# Show the JSON Schema for a template
-klartex schema faktura</code></pre>
-
-<p>The same rendering is available over HTTP at <a href="https://app.klartex.se/api">app.klartex.se/api</a>:</p>
-<pre><code>curl -X POST https://app.klartex.se/api/render \
+  <pre><code>curl -X POST https://app.klartex.se/api/render \
   -H 'Content-Type: application/json' \
-  -d '{"template":"faktura","data":{...}}' \
-  -o invoice.pdf</code></pre>
+  -d '{"template":"faktura","data":{
+        "invoice_number":"2026-001","date":"2026-03-01","due_date":"2026-03-31",
+        "recipient":{"name":"Kundföretaget AB"},
+        "lines":[{"description":"Konsultarbete","quantity":10,"unit":"tim",
+                  "unit_price":1200,"vat_percent":25}]}}' \
+  -o faktura.pdf</code></pre>
 
-<h2>Example: Invoice</h2>
-<pre><code>{
-  "invoice_number": "2026-001",
-  "date": "2026-02-15",
-  "due_date": "2026-03-17",
-  "recipient": {
-    "name": "Kundforetaget AB",
-    "org_number": "556123-4567",
-    "address_line1": "Storgatan 1",
-    "address_line2": "123 45 Stockholm"
-  },
-  "lines": [
-    {
-      "description": "Consulting services",
-      "quantity": 40,
-      "unit": "hrs",
-      "unit_price": 1200.00,
-      "vat_percent": 25
-    }
-  ],
-  "bankgiro": "1234-5678",
-  "note": "Thank you!"
-}</code></pre>
-<p>Save as <code>invoice.json</code>, then run: <code>klartex -t faktura -d invoice.json</code></p>
+  <h2>Två sätt att använda det</h2>
 
-<h2>Links</h2>
-<ul>
-  <li><a href="https://pypi.org/project/klartex/">PyPI</a></li>
-  <li><a href="https://github.com/swedev/klartex">GitHub</a></li>
-  <li><a href="/llms.txt">llms.txt</a></li>
-</ul>
+  <p><strong>Rendera ett dokument nu.</strong> Anropa <code>app.klartex.se/api</code> som ovan. Ingenting att installera — servern har TeX-installationen. Det här är vägen för enstaka dokument och för agenter som fått i uppgift att producera en PDF.</p>
 
-<footer>MIT License &middot; <a href="https://github.com/swedev/klartex">swedev/klartex</a></footer>
+  <p><strong>Bygg in det i din tjänst.</strong> Installera paketet och kör renderingen i din egen miljö:</p>
+
+  <pre><code>pip install klartex</code></pre>
+
+  <p>Kräver Python ≥ 3.12 och XeLaTeX (<code>brew install --cask mactex</code> eller <code>apt install texlive-xetex</code> plus <code>ulem</code>, <code>tcolorbox</code> och <code>siunitx</code>). Det är flera gigabyte TeX — värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code>app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code>klartex</code> som bibliotek.</p>
+
+  <h2>Mallar</h2>
+
+  <table class="templates-table">
+  <tr><th>Mall</th><th>Beskrivning</th></tr>
+  <tr><td><code>_block</code></td><td>Blockmotorn — bygg dokumentet fritt av typade block när ingen mall passar</td></tr>
+  <tr><td><code>balansrakning</code></td><td>Balansräkning med tillgångar och eget kapital och skulder</td></tr>
+  <tr><td><code>budgetrapport</code></td><td>Budgetrapport med kontokoder, budgeterat och utfall</td></tr>
+  <tr><td><code>faktura</code></td><td>Faktura med artikelrader, moms och betalningsuppgifter</td></tr>
+  <tr><td><code>kvitto</code></td><td>Kvitto med artikelrader, totalsumma och betalsätt</td></tr>
+  <tr><td><code>protokoll</code></td><td>Mötesprotokoll med dagordning, beslut och justerare</td></tr>
+  <tr><td><code>resultatrakning</code></td><td>Resultaträkning med jämförelseår och valfri notapparat</td></tr>
+  <tr><td><code>sie-exportrapport</code></td><td>Läsbar PDF av SIE4-bokföringsdata</td></tr>
+  </table>
+
+  <h2>Ta reda på vad som ska skickas</h2>
+
+  <p>Scheman hämtas från API:t — ingenting behöver gissas eller hårdkodas:</p>
+
+  <pre><code>GET  /api/templates                  # alla mallar
+GET  /api/templates/faktura/schema   # JSON Schema för en mall
+GET  /api/blocks                     # de 20 blocktyperna
+GET  /api/blocks/text/schema         # JSON Schema för en blocktyp</code></pre>
+
+  <p>Samma information finns i <a href="/llms.txt">llms.txt</a>, skriven för att läsas av språkmodeller.</p>
+
+  <h2>Vad som är öppet</h2>
+
+  <p>Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och anropen är takade per IP-adress.</p>
+
+  <p>Att registrera en <strong>egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver ett konto. <strong>Konton är under utveckling och inte lanserade än</strong>, så <code>POST /api/page-templates</code> svarar <code>401</code> tills vidare. Det är väntat och inte ett fel. Fram till dess går egen formgivning att skicka med per anrop via <code>page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan.</p>
+
+  <footer>
+    <a href="https://pypi.org/project/klartex/">PyPI</a> ·
+    <a href="https://github.com/swedev/klartex">GitHub</a> ·
+    <a href="/llms.txt">llms.txt</a><br>
+    MIT-licens · swedev/klartex
+  </footer>
 
 </body>
 </html>
