@@ -92,7 +92,7 @@ Save as `doc.json`, then run: `klartex -d doc.json`
 
 agenda, budgettabell, callout, clause, columns, description_list, form, heading, latex, list, name_roster, notapparat, page_break, parties, quote, resultatrakning, signatures, table, text, title_page
 
-Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API at https://api.klartex.se (`GET /blocks`, `GET /blocks/{name}/schema`).
+Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API at https://app.klartex.se (`GET /api/blocks`, `GET /api/blocks/{name}/schema`).
 
 ## Page setup and branding in recipes
 

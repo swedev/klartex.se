@@ -5,7 +5,7 @@
 # Requires:
 #   - hcloud CLI authenticated (`hcloud context active` shows klartex)
 #   - SSH key already uploaded (`hcloud ssh-key list` shows it)
-#   - DNS for klartex.se / app / api pointing at the resulting IP (do this AFTER)
+#   - DNS for klartex.se / www / app pointing at the resulting IP (do this AFTER)
 
 set -euo pipefail
 
@@ -83,7 +83,6 @@ Next steps:
        klartex.se      A   $IP
        www.klartex.se  A   $IP
        app.klartex.se  A   $IP
-       api.klartex.se  A   $IP
 
   2. Wait ~2 min for cloud-init to finish, then verify:
        ssh klartex@$IP "cloud-init status --wait && docker --version"

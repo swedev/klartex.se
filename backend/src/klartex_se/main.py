@@ -1,6 +1,6 @@
-"""FastAPI app entrypoint. Mounts discovery + render routers."""
+"""FastAPI app entrypoint. Mounts discovery + render routers under /api."""
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 
 from klartex_se import __version__
 from klartex_se.discovery import router as discovery_router
@@ -11,14 +11,27 @@ app = FastAPI(
     title="klartex.se backend",
     description="Wraps klartex (library) for the klartex.se webapp.",
     version=__version__,
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url="/api/docs/oauth2-redirect",
 )
 
-app.include_router(discovery_router)
-app.include_router(page_template_router)
-app.include_router(render_router)
+# Every route lives under /api: Caddy proxies /api/* to this app on the same
+# origin as the webapp bundle, and Vite proxies /api in dev, so paths are
+# identical everywhere. Defining the prefix once keeps a new router from
+# missing it.
+api_router = APIRouter(prefix="/api")
 
 
-@app.get("/health")
+@api_router.get("/health")
 def health() -> dict:
     """Liveness probe — used by Docker healthcheck + uptime monitoring."""
     return {"status": "ok", "version": __version__}
+
+
+api_router.include_router(discovery_router)
+api_router.include_router(page_template_router)
+api_router.include_router(render_router)
+
+app.include_router(api_router)

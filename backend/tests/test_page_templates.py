@@ -115,7 +115,7 @@ def test_delete():
 # --- HTTP routes ------------------------------------------------------------
 
 def test_list_empty(client):
-    r = client.get("/page-templates")
+    r = client.get("/api/page-templates")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -123,10 +123,10 @@ def test_list_empty(client):
 def test_create_requires_admin(client):
     body = {"name": "vkf", "template": b64("x"), "assets": {}}
     # No auth header.
-    r = client.post("/page-templates", json=body)
+    r = client.post("/api/page-templates", json=body)
     assert r.status_code == 401
     # With auth.
-    r = client.post("/page-templates", json=body, headers=AUTH)
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 201
     assert r.json()["name"] == "vkf"
 
@@ -138,38 +138,38 @@ def test_create_then_get_then_delete(client):
         "assets": {"logo.pdf": b64(b"%PDF-")},
         "description": "demo bundle",
     }
-    r = client.post("/page-templates", json=body, headers=AUTH)
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 201
 
-    r = client.get("/page-templates/demo")
+    r = client.get("/api/page-templates/demo")
     assert r.status_code == 200
     assert r.json()["description"] == "demo bundle"
 
-    r = client.get("/page-templates")
+    r = client.get("/api/page-templates")
     assert {b["name"] for b in r.json()} == {"demo"}
 
-    r = client.delete("/page-templates/demo", headers=AUTH)
+    r = client.delete("/api/page-templates/demo", headers=AUTH)
     assert r.status_code == 204
-    r = client.get("/page-templates/demo")
+    r = client.get("/api/page-templates/demo")
     assert r.status_code == 404
 
 
 def test_create_conflict_then_overwrite(client):
     body = {"name": "x", "template": b64("v1"), "assets": {}}
-    r = client.post("/page-templates", json=body, headers=AUTH)
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 201
-    r = client.post("/page-templates", json=body, headers=AUTH)
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 409
     body["overwrite"] = True
     body["template"] = b64("v2")
-    r = client.post("/page-templates", json=body, headers=AUTH)
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 201
 
 
 def test_unconfigured_admin_returns_503(client, monkeypatch):
     monkeypatch.delenv("ADMIN_TOKEN", raising=False)
     r = client.post(
-        "/page-templates",
+        "/api/page-templates",
         json={"name": "x", "template": b64("y"), "assets": {}},
         headers=AUTH,
     )
@@ -178,7 +178,7 @@ def test_unconfigured_admin_returns_503(client, monkeypatch):
 
 def test_invalid_base64_returns_400(client):
     r = client.post(
-        "/page-templates",
+        "/api/page-templates",
         json={"name": "x", "template": "not-base64!!!", "assets": {}},
         headers=AUTH,
     )

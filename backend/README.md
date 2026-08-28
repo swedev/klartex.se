@@ -8,28 +8,28 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 
 | Metod & path | Vad |
 |--------------|-----|
-| `GET /health` | Liveness — används av Docker healthcheck |
-| `GET /templates` | Lista mallar (block-engine + recipe) |
-| `GET /templates/{name}/schema` | JSON Schema för en mall |
-| `GET /blocks` | Lista block-engine-blocktyper |
-| `GET /blocks/{name}/schema` | JSON Schema för en blocktyp |
-| `POST /render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 |
-| `GET /page-templates` | Lista registrerade sidmalls-bundles |
-| `GET /page-templates/{name}` | Metadata för en bundle |
-| `POST /page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) — kräver `ADMIN_TOKEN` |
-| `DELETE /page-templates/{name}` | Ta bort en bundle — kräver `ADMIN_TOKEN` |
+| `GET /api/health` | Liveness — används av Docker healthcheck |
+| `GET /api/templates` | Lista mallar (block-engine + recipe) |
+| `GET /api/templates/{name}/schema` | JSON Schema för en mall |
+| `GET /api/blocks` | Lista block-engine-blocktyper |
+| `GET /api/blocks/{name}/schema` | JSON Schema för en blocktyp |
+| `POST /api/render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 |
+| `GET /api/page-templates` | Lista registrerade sidmalls-bundles |
+| `GET /api/page-templates/{name}` | Metadata för en bundle |
+| `POST /api/page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) — kräver `ADMIN_TOKEN` |
+| `DELETE /api/page-templates/{name}` | Ta bort en bundle — kräver `ADMIN_TOKEN` |
 
-Multipart-varianten `/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
+Multipart-varianten `/api/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
 
-## Belastningstak på `/render`
+## Belastningstak på `/api/render`
 
 En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Endpointen tar därför en av två render-platser innan arbetet börjar. Är båda upptagna svaras `503` direkt — med `Retry-After: 5` och `detail.type = "overloaded"` — i stället för att köa.
 
-Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Edge-lagret kompletterar med rate limit och body-gräns på `POST /render` (se `infra/Caddyfile`), och containern har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
+Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Edge-lagret kompletterar med rate limit och body-gräns på `POST /api/render` (se `infra/Caddyfile`), och containern har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
 
 ## Assets i registrerade sidmallar
 
-En sidmall registrerad via `/page-templates` sparas som en bundle: `page_template.tex.jinja` plus dess assets i samma katalog. Vid `/render` pekas klartex på bundle-katalogen, som blir både sökväg för `TEXINPUTS` och arbetskatalog för xelatex. Det ger två referensformer i mallen:
+En sidmall registrerad via `/api/page-templates` sparas som en bundle: `page_template.tex.jinja` plus dess assets i samma katalog. Vid `/api/render` pekas klartex på bundle-katalogen, som blir både sökväg för `TEXINPUTS` och arbetskatalog för xelatex. Det ger två referensformer i mallen:
 
 | Referens i mallen | Löses mot |
 |-------------------|-----------|
@@ -49,8 +49,8 @@ pip install -e ".[dev]"
 uvicorn klartex_se.main:app --reload --port 8000
 
 # Smoke-test
-curl http://localhost:8000/templates | jq '.[].name'
-curl -X POST http://localhost:8000/render \
+curl http://localhost:8000/api/templates | jq '.[].name'
+curl -X POST http://localhost:8000/api/render \
   -H "Content-Type: application/json" \
   -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"Test"}]}}' \
   -o /tmp/test.pdf
