@@ -31,6 +31,11 @@ permissions:
 jobs:
   build:
     name: Build and publish image
+    # Publishing to GHCR needs more than the workflow's read-only default.
+    # Scoped to this job so the deploy job keeps read-only credentials.
+    permissions:
+      contents: read
+      packages: write
     # Tag guard: the dispatch UI preselects the default branch, and an
     # untagged build must never reach production.
     if: github.ref_type == 'tag'
