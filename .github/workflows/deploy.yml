@@ -1,10 +1,10 @@
 name: Deploy
 
-# A v* tag deploys that version to the production server. The image itself
-# is built and smoke-tested by backend.yml when the commit lands on main;
-# this workflow verifies that image exists and rolls it out. Rebuilding here
-# would repeat a ~15 minute arm64 build of a 7 GB TeX Live image for a
-# byte-identical result.
+# A v* tag deploys that version to the production server. Building belongs
+# in backend.yml, which builds and smoke-tests the image when the commit
+# lands on main; this workflow verifies that already-tested image exists in
+# GHCR and rolls it out. A rebuild here would produce an untested image from
+# the same source.
 #
 # workflow_dispatch from a tag re-deploys that tag (rollback).
 #

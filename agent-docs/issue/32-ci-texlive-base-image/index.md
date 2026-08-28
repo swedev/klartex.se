@@ -6,6 +6,8 @@
 
 Varje release bygger om den ~7 GB stora TeX Live-imagen (~15 min QEMU-arm64) eftersom GHA-cachen evictar de tunga lagren och en oanvänd `COPY pyproject.toml` invaliderar venv-lagret vid varje versionsbump. Planen bryter ut de tunga lagren till en basimage `ghcr.io/swedev/klartex-se-base` (`backend/Dockerfile.base` + egen workflow som bara triggar när basen ändras), slimmar app-Dockerfilen till `FROM <bastagg@digest>` + venv + `COPY src/`, och tar bort den onödiga COPY-raden. Utrullning i två PR:er: basen först (taggen måste finnas i GHCR), sedan den slimmade app-Dockerfilen.
 
+**Läge:** Fas 1 (PR #35) är mergad; basimagen `20260828-1` är publicerad i GHCR (amd64 + arm64, publik) och verifierad. Återstår fas 2 — slimmad `backend/Dockerfile` pinnad mot `20260828-1@sha256:640992…` plus dok-uppdateringar (`backend/README.md`, `PLAN.md`, kommentaren i `deploy.yml`).
+
 ## Triageringsstatus
 
 | Fält | Värde |

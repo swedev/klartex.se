@@ -65,13 +65,25 @@ pytest -k "not render"   # bara discovery-tester (snabbt, ingen xelatex)
 
 ## Docker
 
+Imagen är tvådelad. De tunga, sällan ändrade lagren — TeX Live-basen, apt-paketen, Microsofts kärnfonter och `texlive-bin`-symlänken — bor i `Dockerfile.base` och publiceras som `ghcr.io/swedev/klartex-se-base` av `.github/workflows/backend-base.yml`. `Dockerfile` bygger app-imagen ovanpå den: venv med de pinnade beroendena plus `src/`. Ett app-bygge tar därför ett par minuter i stället för att bygga om ~7 GB.
+
 ```bash
 docker build -t klartex-se-backend:dev .
 docker run --rm -p 8000:8000 klartex-se-backend:dev
 ```
 
+Basimagen hämtas från GHCR vid bygget. Paketet är publikt, så ingen inloggning behövs.
+
+### Bumpa basimagen
+
+1. Ändra `Dockerfile.base` och merga till `main`. Basworkflown bygger multi-arch och publicerar en ny tagg, `YYYYMMDD-<run_number>`.
+2. Läs av taggens manifest-digest, t.ex. med `docker buildx imagetools inspect ghcr.io/swedev/klartex-se-base:<tagg>`.
+3. Uppdatera `FROM`-raden i `Dockerfile` till `<tagg>@sha256:<digest>` i en egen PR.
+
+Pinnen bär både tagg och digest: taggen för läsbarhet, digesten för att bygget ska vara reproducerbart. Ingen `latest`-tagg publiceras. Publicerade bastaggar får inte raderas så länge någon `Dockerfile` i historiken refererar dem — då går de byggena inte att reproducera.
+
 ## Deploy
 
-Bygg + push sker via `.github/workflows/backend.yml` på varje merge till `main` som rör `backend/`. Bygger multi-arch (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`.
+Bygg + push av app-imagen sker via `.github/workflows/backend.yml` på varje merge till `main` som rör `backend/` (utom `Dockerfile.base`, som i stället triggar basworkflown). Bygger multi-arch (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`.
 
 För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, vänta på workflow, och pusha en matchande `v*`-tagg — den deployar via `.github/workflows/deploy.yml`.
