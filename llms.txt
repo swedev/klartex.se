@@ -10,7 +10,7 @@ Klartex is an open-source CLI tool and Python library that generates professiona
 pip install klartex
 ```
 
-Requires XeLaTeX (`brew install --cask mactex` or `apt install texlive-xetex`).
+Requires XeLaTeX: `brew install --cask mactex` on macOS, or on Debian/Ubuntu `apt install texlive-xetex texlive-fonts-recommended texlive-latex-extra texlive-latex-recommended texlive-science texlive-plain-generic`.
 
 ## Generate a PDF
 
