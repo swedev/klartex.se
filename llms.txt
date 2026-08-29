@@ -100,6 +100,16 @@ Every recipe template accepts `page_template` in object form, the same shape the
 
 `faktura` and `kvitto` additionally take a top-level `footer` — the canonical place for payment details, taking precedence over the page template's footer — plus `sender` (an issuer block beside the recipient) and `logo` / `logo_height` / `logo_offset` in the header.
 
+## Page templates: per-call or registered
+
+`POST /api/render` takes a body of `{"template": "<template name>", "data": { ... }, "page_template": "<registered bundle name>"}`. Template data goes inside `data` — including `page_template` in object form, which is part of the template schema. The top-level `page_template` field is a string only and names a bundle registered on the server (the built-ins `formal`, `clean` and `none` are accepted there too). The two levels are not interchangeable: an object at the top level is rejected with `422`, and a bundle name inside `data` fails schema validation with `400`.
+
+`page_template` in object form travels with the request — font, header font and footer are part of the data, so a call is self-contained and needs no account.
+
+A named page template — a reusable bundle with a logo and its own LaTeX fragment, referenced as `page_template: "<name>"` — is registered once at `POST /api/page-templates` and lives on the server. Writing to that registry requires a bearer token, so it answers `401` without one. Self-serve accounts are under development and not launched, so there is currently no way to obtain a token: `GET /api/page-templates` returning an empty list and `POST` returning `401` are the expected state, not a fault. Use the object form until then.
+
+`GET /api/blocks`, `GET /api/templates`, their `/schema` variants and `POST /api/render` need no token.
+
 ## Change marking
 
 For documents that show what changed between two versions — the canonical case is amending statutes — mark edits inline using git word-diff notation. `{+added text+}` renders green, `[-removed text-]` red and struck through. The markers work in every field that passes through inline formatting, including table cells.
