@@ -11,10 +11,9 @@ app = FastAPI(
     title="klartex.se backend",
     description="Wraps klartex (library) for the klartex.se webapp.",
     version=__version__,
-    docs_url="/api/docs",
+    docs_url=None,
     openapi_url="/api/openapi.json",
     redoc_url=None,
-    swagger_ui_oauth2_redirect_url="/api/docs/oauth2-redirect",
 )
 
 # Every route lives under /api: Caddy proxies /api/* to this app on the same
