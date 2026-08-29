@@ -30,7 +30,7 @@ Om webbappens behov tvingar fram förändringar i kärnan görs de i kärnan, in
 
 ## Landningssidan idag
 
-`index.html` är en enkel statisk sida (inline CSS, ingen build) tillsammans med `assets/`, som bär kopior av de logotyp- och bladfiler sidan refererar samt `favicon.svg`, symbolen i negativ på marin platta — `design/` är källan för dem. `llms.txt` följer [llms.txt-konventionen](https://llmstxt.org) och listar mallar, exempel och länkar för LLM-konsumenter.
+`index.html` är en enkel statisk sida (inline CSS, ingen build) tillsammans med `assets/`, som bär kopior av de logotyp- och bladfiler sidan refererar samt `favicon.svg`, symbolen i negativ på marin platta — `design/` är källan för dem. `assets/fonts/` bär profilens tre typsnitt självhostade som woff2, byggda från google/fonts med `assets/fonts/build.sh`; Source-derivaten heter Klartex Serif och Klartex Sans eftersom OFL:s reserverade typsnittsnamn inte får följa med i en subsettad version. Sidan gör därmed inga anrop utanför `klartex.se`. `llms.txt` följer [llms.txt-konventionen](https://llmstxt.org) och listar mallar, exempel och länkar för LLM-konsumenter.
 
 Driften: `.github/workflows/deploy.yml` synkar `index.html`, `llms.txt` och `assets/` till `/home/klartex/site` på produktionsservern, som Caddy servar som `klartex.se` ur `/srv/site`. Deployen kör bara på `v*`-tagg.
 
