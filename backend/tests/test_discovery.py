@@ -65,3 +65,19 @@ def test_every_listed_block_has_a_schema():
 def test_block_schema_unknown():
     r = client.get("/api/blocks/not-a-real-block/schema")
     assert r.status_code == 404
+
+
+def test_openapi_schema_is_served():
+    r = client.get("/api/openapi.json")
+    assert r.status_code == 200
+    body = r.json()
+    assert "/api/render" in body["paths"]
+
+
+def test_swagger_ui_is_not_served():
+    # The app exposes the OpenAPI document only; no browsable docs page and no
+    # OAuth2 redirect route behind it.
+    for path in ("/api/docs", "/api/docs/oauth2-redirect"):
+        r = client.get(path)
+        assert r.status_code == 404, f"{path}: {r.status_code}"
+        assert r.headers["content-type"].startswith("application/json")
