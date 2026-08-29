@@ -65,7 +65,12 @@
 
   <pre><code>pip install klartex</code></pre>
 
-  <p>Kräver Python ≥ 3.12 och XeLaTeX (<code>brew install --cask mactex</code> eller <code>apt install texlive-xetex</code> plus <code>ulem</code>, <code>tcolorbox</code> och <code>siunitx</code>). Det är flera gigabyte TeX — värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code>app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code>klartex</code> som bibliotek.</p>
+  <p>Kräver Python ≥ 3.12 och XeLaTeX. På macOS <code>brew install --cask mactex</code>; på Debian/Ubuntu:</p>
+
+  <pre><code>sudo apt install texlive-xetex texlive-fonts-recommended \
+  texlive-latex-extra texlive-latex-recommended texlive-science texlive-plain-generic</code></pre>
+
+  <p>Det är flera gigabyte TeX — värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code>app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code>klartex</code> som bibliotek.</p>
 
   <h2>Mallar</h2>
 
@@ -94,7 +99,7 @@ GET  /api/blocks/text/schema         # JSON Schema för en blocktyp</code></pre>
 
   <h2>Vad som är öppet</h2>
 
-  <p>Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och anropen är takade per IP-adress.</p>
+  <p>Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och renderingsanropen är takade per IP-adress.</p>
 
   <p>Att registrera en <strong>egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver ett konto. <strong>Konton är under utveckling och inte lanserade än</strong>, så <code>POST /api/page-templates</code> svarar <code>401</code> tills vidare. Det är väntat och inte ett fel. Fram till dess går egen formgivning att skicka med per anrop via <code>page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan.</p>
 
