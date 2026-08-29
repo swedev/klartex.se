@@ -197,7 +197,9 @@ jobs:
 
           rsync -av --delete -e "ssh $SSH_OPTS" \
             --include='index.html' --include='llms.txt' \
-            --include='assets/' --include='assets/*.svg' --exclude='*' \
+            --include='assets/' --include='assets/*.svg' \
+            --include='assets/fonts/' --include='assets/fonts/*.woff2' \
+            --include='assets/fonts/*-OFL.txt' --exclude='*' \
             ./ "klartex@$HOST:/home/klartex/site/"
 
       - name: Build Caddy, preflight, and restart
