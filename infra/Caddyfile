@@ -2,7 +2,7 @@
 # Two vhosts share automatic Let's Encrypt TLS.
 
 {
-    email matte@insector.se
+    email kontakt@klartex.se
     # Uncomment during initial DNS testing:
     # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
