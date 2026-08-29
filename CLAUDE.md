@@ -30,7 +30,9 @@ Om webbappens behov tvingar fram förändringar i kärnan görs de i kärnan, in
 
 ## Landningssidan idag
 
-`index.html` är en enkel statisk sida (inline CSS, ingen build). Driftas via GitHub Pages eller motsvarande på `klartex.se`. `llms.txt` följer [llms.txt-konventionen](https://llmstxt.org) och listar mallar, exempel och länkar för LLM-konsumenter.
+`index.html` är en enkel statisk sida (inline CSS, ingen build) tillsammans med `assets/`, som bär kopior av de logotyp- och bladfiler sidan refererar — `design/` är källan för dem. `llms.txt` följer [llms.txt-konventionen](https://llmstxt.org) och listar mallar, exempel och länkar för LLM-konsumenter.
+
+Driften: `.github/workflows/deploy.yml` synkar `index.html`, `llms.txt` och `assets/` till `/home/klartex/site` på produktionsservern, som Caddy servar som `klartex.se` ur `/srv/site`. Deployen kör bara på `v*`-tagg.
 
 Tills webappen byggs: ändringar i landningssidan görs direkt i `index.html`/`llms.txt` och commitas. Ingen build, inga dependencies.
 

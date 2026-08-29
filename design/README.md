@@ -2,6 +2,8 @@
 
 Källdokument för grafisk profil och appdesign. Öppna `.dc.html`-filerna i en webbläsare; `support.js` är deras gemensamma runtime. Logotyp- och komplementgrafikfilerna (`*.svg`) ligger i samma katalog eftersom canvaserna refererar dem med relativa namn.
 
+`assets/` i repots rot bär kopior av de filer landningssidan refererar (`klartex-lockup-reverse.svg`, `klartex-blad-arm.svg`, `klartex-blad-omvant.svg`) — den katalogen är det som deployas. `design/` är källan: ändras någon av dem här ska kopian uppdateras.
+
 | Fil | Innehåll |
 |-----|----------|
 | `Klartex grafisk profil.dc.html` | **Auktoriteten.** Logotyp, färgroller, typografi, ikonspråk (Lucide), dokumentmall (brevpapper) och komplementgrafik (bladet). |
