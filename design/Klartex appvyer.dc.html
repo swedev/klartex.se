@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F2F1ED; }
+  a { color: #0A55C6; text-decoration: none; }
+  a:hover { color: #071A43; text-decoration: underline; text-underline-offset: 2px; }
+</style>
+</helmet>
+
+<div style="font-family:'Source Sans 3',system-ui,sans-serif;color:#14161A;background:#F2F1ED;padding:0 0 80px">
+  <div style="max-width:1100px;margin:0 auto;background:#FBFAF8">
+
+    <div style="padding:72px 56px 56px;background:#071A43;color:#FFFFFF;display:flex;flex-direction:column;gap:44px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:32px;flex-wrap:wrap">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#8FA8CE">Appvyer · utkast 1 · augusti 2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#8FA8CE">Radix Themes</div>
+      </div>
+      <img src="klartex-lockup-reverse.svg" alt="klartex" style="width:380px;max-width:100%;display:block">
+      <p style="margin:0;max-width:600px;font-size:17px;line-height:1.6;color:#C6D4EC;text-wrap:pretty">Varje vy är en egen fil som fyller fönstret och scrollar som en vanlig sida. Den här sidan är innehållsförteckningen och det enda stället där temat definieras. Allt UI-språk bor här — den grafiska profilen befattar sig inte med appen.</p>
+    </div>
+
+    <div style="padding:64px 56px 0;display:flex;flex-direction:column;gap:13px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">Vyer</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Tretton filer</h2>
+    </div>
+
+    <div style="padding:28px 56px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+      <a href="Logga%20in%20-%20e-post.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Logga in · e-post</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Steg 1. Adress in, engångskod ut.</span>
+      </a>
+      <a href="Logga%20in%20-%20kod.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Logga in · kod</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Steg 2. Sex fält, inklistring fördelas.</span>
+      </a>
+      <a href="Logga%20in%20-%20felaktig%20kod.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Logga in · felaktig kod</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Två försök kvar innan ny kod krävs.</span>
+      </a>
+      <a href="Dokument.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Dokument</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Listan, med markering och massåtgärder.</span>
+      </a>
+      <a href="Dokument%20-%20tomt.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Dokument · tomt</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Första gången. En mening, en knapp.</span>
+      </a>
+      <a href="Dokument%20-%20detalj.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Dokument · detalj</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Arket, historiken, nedladdning.</span>
+      </a>
+      <a href="Genererade%20filer.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Genererade filer</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Varje API-anrop ger en fil, inte ett dokument.</span>
+      </a>
+      <a href="Dokumentredigering.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Dokumentredigering</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Text och uppgifter. Mallen styr utseendet.</span>
+      </a>
+      <a href="Mallar.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Mallar</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Lista med version och hur många dokument som använder mallen.</span>
+      </a>
+      <a href="Mallredigering.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Mallredigering</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Blocklista, ark, inspektör. Redigering på sidan.</span>
+      </a>
+      <a href="Installningar.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Inställningar</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Allt på en sida: profil, organisation, medlemmar, notiser, säkerhet, API-nycklar.</span>
+      </a>
+      <a href="Fel%20-%20sidan%20finns%20inte.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Sidan finns inte</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">404 inuti ramen, inte som egen sida.</span>
+      </a>
+      <a href="Fel%20-%20saknad%20behorighet.dc.html" style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600;color:#071A43">Saknad behörighet</span>
+        <span style="font-size:13.5px;line-height:1.5;color:#6B6A63">Säger vem som kan ge åtkomst.</span>
+      </a>
+    </div>
+
+    <div style="padding:64px 56px 0;display:flex;flex-direction:column;gap:13px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">Tema</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Vad vi skriver över</h2>
+      <p style="margin:0;max-width:620px;font-size:15.5px;line-height:1.6;color:#4A4943;text-wrap:pretty">Fyra saker: accentskalan, gråskalan, radien och typsnitten. Resten av Radix lämnas orört — spacing, kontrollhöjder, z-index, animationer och fokushantering är deras.</p>
+    </div>
+
+    <div style="padding:28px 56px 0;display:flex;flex-wrap:wrap;gap:16px">
+      <div style="flex:1;min-width:320px;border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:14px;font-weight:600">Theme-inställningar</span>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.9;background:#F7F6F3;border:1px solid #EFEDE7;padding:14px 16px;border-radius:3px">&lt;Theme<br>&nbsp;&nbsp;accentColor="klarbla"<br>&nbsp;&nbsp;grayColor="klartex"<br>&nbsp;&nbsp;radius="small"<br>&nbsp;&nbsp;scaling="100%"<br>&nbsp;&nbsp;panelBackground="solid"<br>&gt;</div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Två egna skalor registreras vid sidan av Radix inbyggda. <code style="font-family:'JetBrains Mono',monospace;font-size:12px">panelBackground="solid"</code> stänger av translucensen — paneler ska vara papper, inte glas.</div>
+      </div>
+      <div style="flex:1;min-width:320px;border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:14px;font-weight:600">Typsnitt</span>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.9;background:#F7F6F3;border:1px solid #EFEDE7;padding:14px 16px;border-radius:3px">--default-font-family: Source Sans 3<br>--heading-font-family: Source Sans 3<br>--code-font-family: JetBrains Mono<br>--strong-weight: 600</div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Source Serif 4 används inte i gränssnittet — bara inuti dokumentförhandsvisningar, där den är dokumentets typsnitt och inte appens.</div>
+      </div>
+    </div>
+
+    <div style="padding:16px 56px 0">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:600">Accentskala <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:400;color:#6B6A63">klarbla</span></span>
+          <span style="font-size:13px;color:#6B6A63">steg 9 är profilens Klarblå 600</span>
+        </div>
+        <div style="display:flex">
+          <div style="flex:1;height:48px;background:#FBFCFE"></div>
+          <div style="flex:1;height:48px;background:#F3F7FE"></div>
+          <div style="flex:1;height:48px;background:#E6EFFD"></div>
+          <div style="flex:1;height:48px;background:#D6E4FC"></div>
+          <div style="flex:1;height:48px;background:#C2D6FA"></div>
+          <div style="flex:1;height:48px;background:#A9C4F6"></div>
+          <div style="flex:1;height:48px;background:#86AAF0"></div>
+          <div style="flex:1;height:48px;background:#5A8AE8"></div>
+          <div style="flex:1;height:48px;background:#0A5FD8"></div>
+          <div style="flex:1;height:48px;background:#0854C4"></div>
+          <div style="flex:1;height:48px;background:#0A55C6"></div>
+          <div style="flex:1;height:48px;background:#0C2E63"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin-top:8px">
+          <span style="font-size:14px;font-weight:600">Gråskala <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:400;color:#6B6A63">klartex</span></span>
+          <span style="font-size:13px;color:#6B6A63">varm, byggd på profilens papper, linje och Grå 600</span>
+        </div>
+        <div style="display:flex">
+          <div style="flex:1;height:48px;background:#FBFAF8"></div>
+          <div style="flex:1;height:48px;background:#F7F6F3"></div>
+          <div style="flex:1;height:48px;background:#F2F1ED"></div>
+          <div style="flex:1;height:48px;background:#ECEAE4"></div>
+          <div style="flex:1;height:48px;background:#E3E1DB"></div>
+          <div style="flex:1;height:48px;background:#DAD7CF"></div>
+          <div style="flex:1;height:48px;background:#CBC7BD"></div>
+          <div style="flex:1;height:48px;background:#B3AEA2"></div>
+          <div style="flex:1;height:48px;background:#8F8B80"></div>
+          <div style="flex:1;height:48px;background:#837F74"></div>
+          <div style="flex:1;height:48px;background:#6B6A63"></div>
+          <div style="flex:1;height:48px;background:#1F1E1A"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:16px 56px 0;display:flex;flex-wrap:wrap;gap:16px">
+      <div style="flex:1;min-width:320px;border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font-size:14px;font-weight:600">Knappar</span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:3px;background:#0A5FD8;color:#FFFFFF;font-size:14px;font-weight:500">Solid</span>
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:3px;background:#E6EFFD;color:#0A55C6;font-size:14px;font-weight:500">Soft</span>
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:3px;box-shadow:inset 0 0 0 1px #CBC7BD;font-size:14px;font-weight:500">Outline</span>
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 10px;border-radius:3px;color:#0A55C6;font-size:14px;font-weight:500">Ghost</span>
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:3px;background:#9E3B22;color:#FFFFFF;font-size:14px;font-weight:500">Fara</span>
+          <span style="display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:3px;background:#ECEAE4;color:#B3AEA2;font-size:14px;font-weight:500">Inaktiv</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:24px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63;line-height:1.7">
+          <span>radius 3</span><span>höjd 32</span><span>padding 12</span><span>vikt 500</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:320px;border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font-size:14px;font-weight:600">Fälttillstånd</span>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="height:32px;border-radius:3px;box-shadow:inset 0 0 0 1px #DAD7CF;background:#FFFFFF;display:flex;align-items:center;padding:0 10px;font-size:14px;color:#8F8B80">Vilande</div>
+          <div style="height:32px;border-radius:3px;box-shadow:inset 0 0 0 1px #0A5FD8,0 0 0 2px #DCE9FF;background:#FFFFFF;display:flex;align-items:center;padding:0 10px;font-size:14px">Fokus</div>
+          <div style="height:32px;border-radius:3px;box-shadow:inset 0 0 0 1px #9E3B22;background:#FFFFFF;display:flex;align-items:center;padding:0 10px;font-size:14px;color:#9E3B22">Fel</div>
+          <div style="height:32px;border-radius:3px;box-shadow:inset 0 0 0 1px #ECEAE4;background:#F7F6F3;display:flex;align-items:center;padding:0 10px;font-size:14px;color:#B3AEA2">Låst</div>
+        </div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Fokusringen är Radix egen: 1 px accent inuti kanten plus 2 px accent-3 utanför. Den ritas aldrig bort.</div>
+      </div>
+    </div>
+
+    <div style="padding:16px 56px 0">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;border-radius:3px;padding:22px 24px;display:flex;flex-wrap:wrap;gap:32px">
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:11px">
+          <span style="font-size:14px;font-weight:600">Regler för ramen</span>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.55;color:#4A4943">
+            <div>Sidopanelen är navigation. Den får aldrig innehålla knappar som utför något.</div>
+            <div>Huvudraden bär vyns namn till vänster och vyns handlingar till höger. Exakt en solid knapp.</div>
+            <div>Arbetsytan har 20 px marginal. Paneler i den har 1 px kant och 3 px radie, aldrig skugga.</div>
+            <div>Breda tabeller scrollar i sidled inuti sin panel i stället för att krympa kolumnerna.</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:11px">
+          <span style="font-size:14px;font-weight:600">Radix-komponenter i bruk</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Table</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Checkbox</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Badge</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">TextField</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Select</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">SegmentedControl</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">DropdownMenu</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Dialog</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Callout</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">IconButton</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Tooltip</span>
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:3px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:12px">Avatar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:56px 56px 64px">
+      <div style="border-top:1px solid #E3E1DB;padding-top:20px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:16px">
+        <span style="font-size:13px;color:#9A9891">Klartex appvyer · utkast 1 · augusti 2026</span>
+        <img src="klartex-lockup.svg" alt="klartex" style="width:104px;display:block;opacity:0.7">
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

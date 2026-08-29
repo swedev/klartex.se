@@ -1,0 +1,13 @@
+<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="367" height="269" viewBox="713 542 367 269" role="img" aria-label="Klartex – bladet">
+  <title>Klartex – bladet</title>
+  <defs>
+    <linearGradient id="g" x1="762" y1="556" x2="1082" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B4FA8" stop-opacity="0.9"></stop>
+      <stop offset="0.34" stop-color="#153F86" stop-opacity="0.72"></stop>
+      <stop offset="0.66" stop-color="#0F2F63" stop-opacity="0.42"></stop>
+      <stop offset="0.86" stop-color="#0B2148" stop-opacity="0.16"></stop>
+      <stop offset="1" stop-color="#071A43" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+  <path d="M 772.13849 543 C 825 543, 860.70 547, 880 570 L 1078 806.61 C 1087.63 818.11, 921.93 790.39, 877 736.7115 L 761.30 598.45 A 33 33 0 0 0 713.98207 595.05 L 772.13849 543 Z" fill="url(#g)"></path>
+</svg>

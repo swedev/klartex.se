@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F2F1ED; }
+  a { color: #0A5FD8; text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { color: #071A43; }
+</style>
+</helmet>
+
+<div style="font-family:'Source Sans 3',system-ui,sans-serif;color:#14161A;background:#F2F1ED;padding:0 0 90px">
+
+  <div style="max-width:1180px;margin:0 auto;background:#FBFAF8">
+
+    <!-- ══════════ OMSLAG ══════════ -->
+    <div style="padding:88px 88px 72px;background:#071A43;color:#FFFFFF;display:flex;flex-direction:column;gap:64px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:40px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#8FA8CE">Grafisk profil · version 1.0 · augusti 2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#8FA8CE">Intern</div>
+      </div>
+      <img src="klartex-lockup-reverse.svg" alt="klartex" style="width:560px;max-width:100%;display:block">
+      <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-end;justify-content:space-between">
+        <p style="margin:0;max-width:520px;font-size:17px;line-height:1.6;color:#C6D4EC;text-wrap:pretty">Klartex gör färdiga dokument. Profilen ska därför bete sig som en maskin: få beslut, hårt hållna, upprepade utan variation. Det som får variera är innehållet — aldrig ramen runt det.</p>
+        <div style="display:flex;gap:10px">
+          <div style="width:52px;height:52px;background:#071A43;border:1px solid rgba(255,255,255,0.25)"></div>
+          <div style="width:52px;height:52px;background:#0B2B65"></div>
+          <div style="width:52px;height:52px;background:#0870FF"></div>
+          <div style="width:52px;height:52px;background:#FBFAF8"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 01 LOGOTYP ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">01 — Logotyp</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Ett märke, två storleksklasser</h2>
+      <p style="margin:0;max-width:660px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Ordmärkets konturer och symbolen ligger i samma SVG. Filen har inget typsnittsberoende och ska aldrig skrivas om som text — använd den som den är.</p>
+    </div>
+
+    <div style="padding:36px 88px 0;display:flex;flex-wrap:wrap;gap:24px">
+      <div style="flex:1;min-width:420px;border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid #E3E1DB;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;font-weight:600">Primär · sigill</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891">klartex-lockup.svg</span>
+        </div>
+        <div style="padding:52px 40px;display:flex;justify-content:center">
+          <img src="klartex-lockup.svg" alt="klartex" style="width:340px;max-width:100%;display:block">
+        </div>
+        <div style="padding:0 18px 16px;font-size:13px;line-height:1.5;color:#6B6A63;text-wrap:pretty">Symbolhöjd 1,043 × grad, nedsänkning 0,132, mellanrum 0,48. Används från 120 px bredd och uppåt.</div>
+      </div>
+      <div style="flex:1;min-width:420px;border:1px solid #E3E1DB;background:#071A43;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.16);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;font-weight:600;color:#FFFFFF">Negativ</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8FA8CE">klartex-lockup-reverse.svg</span>
+        </div>
+        <div style="padding:52px 40px;display:flex;justify-content:center">
+          <img src="klartex-lockup-reverse.svg" alt="klartex" style="width:340px;max-width:100%;display:block">
+        </div>
+        <div style="padding:0 18px 16px;font-size:13px;line-height:1.5;color:#8FA8CE;text-wrap:pretty">Används på mörk bakgrund. Ordmärket är rent vitt, symbolens band ljusare blått för att hålla isär formen.</div>
+      </div>
+    </div>
+
+    <div style="padding:24px 88px 0;display:flex;flex-wrap:wrap;gap:24px">
+      <div style="flex:1;min-width:420px;border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid #E3E1DB;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;font-weight:600">Enfärg svart</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891">klartex-lockup-svart.svg</span>
+        </div>
+        <div style="padding:52px 40px;display:flex;justify-content:center">
+          <img src="klartex-lockup-svart.svg" alt="klartex" style="width:340px;max-width:100%;display:block">
+        </div>
+        <div style="padding:0 18px 16px;font-size:13px;line-height:1.5;color:#6B6A63;text-wrap:pretty">För svartvit utskrift, fax, gravyr, stämpel och allt annat som bara har en färg. Gradienterna är borta och symbolen är en enda silhuett — vecken bärs av konturen, inte av tonskillnader.</div>
+      </div>
+      <div style="flex:1;min-width:420px;border:1px solid #E3E1DB;background:#000000;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.18);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;font-weight:600;color:#FFFFFF">Enfärg vit</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8A8A">klartex-lockup-vit.svg</span>
+        </div>
+        <div style="padding:52px 40px;display:flex;justify-content:center">
+          <img src="klartex-lockup-vit.svg" alt="klartex" style="width:340px;max-width:100%;display:block">
+        </div>
+        <div style="padding:0 18px 16px;font-size:13px;line-height:1.5;color:#8A8A8A;text-wrap:pretty">Samma fil urvänd. Använd den när underlaget är mörkt och tryckningen är enfärgad — inte i stället för den negativa färgversionen.</div>
+      </div>
+    </div>
+
+    <div style="padding:24px 88px 0;display:flex;flex-wrap:wrap;gap:24px">
+      <div style="flex:2;min-width:520px;border:1px solid #E3E1DB;background:#FFFFFF;padding:30px 32px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:20px">
+          <span style="font-size:14px;font-weight:600">Friyta</span>
+          <span style="font-size:13px;color:#6B6A63">= ordmärkets x-höjd</span>
+        </div>
+        <div style="display:flex;justify-content:center;padding:18px 0">
+          <div style="position:relative;padding:19.6px 31.7px 22.5px 49px;outline:1px dashed #0A5FD8;background:rgba(10,95,216,0.05)">
+            <img src="klartex-lockup.svg" alt="" style="width:290px;display:block">
+          </div>
+        </div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Friytan X är ordmärkets x-höjd. Över, till höger och under är den exakt X — mätt från versalhöjden, från märkets yttersta bläck respektive från baslinjen. Symbolens stapel och svans ligger utanför de referenserna och går därför in i friytan, vilket är varför den synliga luften där är mindre än X. Till vänster är den 1,55 X: k:ets stapel möter kanten som en solid vertikal och behöver mer luft än en avsmalnande spets. Likformig padding runt filens ram ger i stället ett märke som uppfattas ligga snett i sin ruta. Innanför friytan får ingenting hamna: ingen text, ingen kant, ingen bild, inget annat märke.</div>
+      </div>
+
+      <div style="flex:1;min-width:300px;border:1px solid #E3E1DB;background:#FFFFFF;padding:30px 32px;display:flex;flex-direction:column;gap:22px">
+        <span style="font-size:14px;font-weight:600">Minsta storlek</span>
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;align-items:center;gap:16px">
+            <img src="klartex-lockup.svg" alt="" style="width:120px;display:block">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6A63;line-height:1.6">120 px<br>32 mm</div>
+          </div>
+          <div style="height:1px;background:#EFEDE7"></div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <img src="klartex-symbol-v2.svg" alt="" style="height:16px;display:block">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B6A63;line-height:1.6">16 px symbol<br>favicon, app-ikon</div>
+          </div>
+        </div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Under 120 px används symbolen ensam, aldrig ett hoptryckt ordmärke.</div>
+      </div>
+    </div>
+
+        <div style="padding:24px 88px 0">
+        <div style="border:1px solid #E3E1DB;background:#FFFFFF;padding:30px 32px;display:flex;flex-direction:column;gap:24px">
+          <span style="font-size:14px;font-weight:600">Aldrig</span>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="height:96px;border:1px solid #EFEDE7;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0 18px;box-sizing:border-box">
+                <img src="klartex-lockup.svg" alt="" style="width:100%;max-width:200px;transform:scaleX(0.62);display:block">
+              </div>
+              <div style="font-size:12.5px;line-height:1.5;color:#6B6A63">Förvräng aldrig proportionerna.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="height:96px;border:1px solid #EFEDE7;display:flex;align-items:center;justify-content:center;background:#0870FF;padding:0 18px">
+                <img src="klartex-lockup-reverse.svg" alt="" style="width:100%;max-width:150px;display:block">
+              </div>
+              <div style="font-size:12.5px;line-height:1.5;color:#6B6A63">Lägg aldrig märket på accentblått.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="height:96px;border:1px solid #EFEDE7;display:flex;align-items:center;justify-content:center;padding:0 18px">
+                <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Sans 3',sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.02em;color:#071A43;line-height:1"><span>klartex</span><img src="klartex-symbol-v2.svg" alt="" style="height:1.043em;display:block;transform:translateY(0.132em)"></div>
+              </div>
+              <div style="font-size:12.5px;line-height:1.5;color:#6B6A63">Sätt aldrig om ordmärket i annat typsnitt.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="height:96px;border:1px solid #EFEDE7;display:flex;align-items:center;justify-content:center;padding:0 18px;box-sizing:border-box">
+                <img src="klartex-lockup.svg" alt="" style="width:100%;max-width:180px;display:block;filter:grayscale(1) contrast(0.4)">
+              </div>
+              <div style="font-size:12.5px;line-height:1.5;color:#6B6A63">Tona aldrig ned märket mot bakgrunden.</div>
+            </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 02 FÄRG ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">02 — Färg</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Marin bär, blått pekar</h2>
+      <p style="margin:0;max-width:660px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Två marina, två klarblå och ett papper. Marin 900 är all text och alla ytor med tyngd. Klarblå 500 är märkets färg och används på ytor, ikoner och grafik — men aldrig som text: den når 4,22:1 mot papperet och underkänns för brödtext. Klarblå 600 är den interaktiva färgen och är mörkare just för att klara kravet.</p>
+    </div>
+
+    <div style="padding:36px 88px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:130px;background:#071A43"></div>
+        <div style="padding:18px 20px 20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:15px;font-weight:600">Marin 900</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B6A63;line-height:1.6">#071A43<br>7 26 67<br>100 87 27 33</div>
+          <div style="font-size:13px;line-height:1.5;color:#6B6A63;margin-top:6px">Brödtext, rubriker, mörka ytor, symbolens kropp.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:130px;background:#0B2B65"></div>
+        <div style="padding:18px 20px 20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:15px;font-weight:600">Marin 700</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B6A63;line-height:1.6">#0B2B65<br>11 43 101<br>100 82 22 8</div>
+          <div style="font-size:13px;line-height:1.5;color:#6B6A63;margin-top:6px">Skiljelinjer och hover på mörk yta. Aldrig text mot Marin 900.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:130px;background:#0870FF"></div>
+        <div style="padding:18px 20px 20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:15px;font-weight:600">Klarblå 500 · accent</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B6A63;line-height:1.6">#0870FF<br>8 112 255<br>85 56 0 0</div>
+          <div style="font-size:13px;line-height:1.5;color:#6B6A63;margin-top:6px">Symbolens band, ikonaccent, markerad kant. Aldrig text.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:130px;background:#0A5FD8"></div>
+        <div style="padding:18px 20px 20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:15px;font-weight:600">Klarblå 600 · interaktiv</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B6A63;line-height:1.6">#0A5FD8<br>10 95 216<br>88 64 0 0</div>
+          <div style="font-size:13px;line-height:1.5;color:#6B6A63;margin-top:6px">Länkar, primärknapp, fokusram. Enda blå som får bära text.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:24px 88px 0;display:grid;grid-template-columns:repeat(5,1fr);gap:24px">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:78px;background:#DCE9FF"></div>
+        <div style="padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600">Klarblå 100</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">#DCE9FF</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#6B6A63;margin-top:4px">Markerad rad, vald mall.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:78px;background:#FBFAF8;border-bottom:1px solid #EFEDE7"></div>
+        <div style="padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600">Papper</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">#FBFAF8</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#6B6A63;margin-top:4px">Sidbakgrund, dokumentets ark.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:78px;background:#E3E1DB"></div>
+        <div style="padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600">Linje</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">#E3E1DB</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#6B6A63;margin-top:4px">Alla ramar och avdelare, 1 px.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:78px;background:#6B6A63"></div>
+        <div style="padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600">Grå 600</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">#6B6A63</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#6B6A63;margin-top:4px">Sekundär text, metadata, sidfot.</div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="height:78px;background:#9E3B22"></div>
+        <div style="padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600">Tegel 600</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">#9E3B22</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#6B6A63;margin-top:4px">Fel och varning. Aldrig dekor.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:24px 88px 0">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;padding:26px 32px;display:flex;flex-wrap:wrap;gap:40px;align-items:center">
+        <div style="font-size:14px;font-weight:600;min-width:150px">Kontrast</div>
+        <div style="display:flex;flex-wrap:wrap;gap:28px;font-size:13.5px;color:#4A4943;line-height:1.5">
+          <span>Marin 900 på Papper <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#071A43">16,3:1</strong></span>
+          <span>Papper på Marin 900 <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#071A43">16,3:1</strong></span>
+          <span>Klarblå 600 på Papper <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#071A43">5,5:1</strong></span>
+          <span>Tegel 600 på Papper <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#071A43">6,5:1</strong></span>
+          <span>Grå 600 på Papper <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#071A43">5,2:1</strong></span>
+          <span style="color:#9A9891">Klarblå 500 på Papper <strong style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#9A9891">4,2:1 — ej text</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 03 TYPOGRAFI ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">03 — Typografi</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Serif sätter, sans styr, mono kör</h2>
+      <p style="margin:0;max-width:660px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Source Serif 4 och Source Sans 3 är ritade som en familj och delar proportioner, vilket gör att ett dokument och gränssnittet runt det inte ser ut att komma från två företag. JetBrains Mono är enbart för kod, kommandon och identifierare.</p>
+    </div>
+
+    <div style="padding:36px 88px 0;display:flex;flex-direction:column;gap:20px">
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;display:flex;flex-wrap:wrap">
+        <div style="flex:1;min-width:280px;padding:30px 32px;border-right:1px solid #E3E1DB;display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9A9891">Dokument &amp; rubriker</div>
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:46px;line-height:1;letter-spacing:-0.02em;color:#071A43">Source Serif 4</div>
+          <div style="font-family:'Source Serif 4',serif;font-weight:400;font-size:17px;line-height:1.6;color:#4A4943">Regular 400 · Semibold 600 · Bold 700<br>Levererade dokument, rubriker, ordmärket.</div>
+        </div>
+        <div style="flex:1;min-width:280px;padding:30px 32px;border-right:1px solid #E3E1DB;display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9A9891">Gränssnitt</div>
+          <div style="font-weight:600;font-size:44px;line-height:1;letter-spacing:-0.025em;color:#071A43">Source Sans 3</div>
+          <div style="font-size:16px;line-height:1.6;color:#4A4943">Regular 400 · Semibold 600 · Bold 700<br>Webbapp, etiketter, knappar, hjälptext.</div>
+        </div>
+        <div style="flex:1;min-width:280px;padding:30px 32px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9A9891">Kod</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:32px;line-height:1.1;letter-spacing:-0.04em;color:#071A43">JetBrains Mono</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;color:#4A4943">Regular 400 · Bold 700<br>CLI, API-fält, diarienummer.</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #E3E1DB;background:#FFFFFF;padding:34px 32px;display:flex;flex-direction:column;gap:26px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9A9891">Skala</div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Display · 56/1,05 · serif 600</div>
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:56px;line-height:1.05;letter-spacing:-0.022em;color:#071A43">Offert</div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Rubrik 1 · 32/1,15 · serif 600</div>
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:32px;line-height:1.15;letter-spacing:-0.018em;color:#071A43">Omfattning och leverans</div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Rubrik 2 · 21/1,3 · serif 600</div>
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:21px;line-height:1.3;color:#071A43">§ 4 Ekonomisk rapport</div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Bröd · 16/1,6 · sans 400</div>
+          <div style="font-size:16px;line-height:1.6;color:#14161A;max-width:520px;text-wrap:pretty">Ordinarie ledamöter valdes för en period om två år. Beslutet fattades enhälligt.</div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Liten · 13/1,5 · sans 400</div>
+          <div style="font-size:13px;line-height:1.5;color:#6B6A63">Justeras elektroniskt · Diarienummer 2026-041</div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;align-items:baseline;gap:28px;flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891;width:150px;flex-shrink:0">Kod · 13/1,7 · mono 400</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;color:#14161A">klartex build --mall offert data.json</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 04 IKONSPRÅK ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">04 — Ikonspråk</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Lucide, orört</h2>
+      <p style="margin:0;max-width:660px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Vi ritar inga egna ikoner. Klartex använder <a href="https://lucide.dev">Lucide</a> rakt av: 24 × 24, streck 2, runda avslut och hörn, ingen fyllning. Ett eget ikonspråk är arbete utan avkastning för ett verktyg av den här storleken, och ett välunderhållet set med tusen symboler tar oss längre än åtta hemritade. Färg är alltid Marin 900, eller currentColor i gränssnittet.</p>
+    </div>
+
+    <div style="padding:36px 88px 0;display:flex;flex-wrap:wrap;gap:24px">
+      <div style="flex:2;min-width:520px;border:1px solid #E3E1DB;background:#FFFFFF;padding:30px 32px;display:flex;flex-direction:column;gap:26px">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Dokument</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1" /> <rect width="9" height="7" x="3" y="14" rx="1" /> <rect width="5" height="7" x="16" y="14" rx="1" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Mall</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" /> <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Data in</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Hämta</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8" /> <path d="m4 17 6-6-6-6" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Kör</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M9 3v18" /> <path d="M15 3v18" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Layout</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6a9 9 0 0 0-9 9V3" /> <circle cx="18" cy="6" r="3" /> <circle cx="6" cy="18" r="3" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Version</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            <span style="font-size:12.5px;color:#6B6A63">Klar</span>
+          </div>
+        </div>
+        <div style="height:1px;background:#EFEDE7"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:32px;font-size:13px;line-height:1.55;color:#6B6A63">
+          <span>Set <strong style="color:#071A43">Lucide</strong></span>
+          <span>Rutnät <strong style="color:#071A43">24 × 24</strong></span>
+          <span>Streck <strong style="color:#071A43">2</strong></span>
+          <span>Avslut <strong style="color:#071A43">round</strong></span>
+          <span>Hörn <strong style="color:#071A43">round</strong></span>
+          <span>Licens <strong style="color:#071A43">ISC</strong></span>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:300px;border:1px solid #E3E1DB;background:#FFFFFF;padding:30px 32px;display:flex;flex-direction:column;gap:20px">
+        <span style="font-size:14px;font-weight:600">Rutnätet</span>
+                <div style="position:relative;width:192px;height:192px;align-self:center;background:#FBFAF8;background-image:linear-gradient(#EFEDE7 1px,transparent 1px),linear-gradient(90deg,#EFEDE7 1px,transparent 1px);background-size:8px 8px">
+            <div style="position:absolute;left:16px;top:16px;right:16px;bottom:16px;outline:1px dashed #BFD6FF"></div>
+            <svg width="192" height="192" viewBox="0 0 24 24" fill="none" stroke="#071A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:0;top:0"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>
+        </div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Lucides egen ram: 24 × 24 med 2 px optisk marginal, streck 2, runda avslut och hörn. Rita aldrig egna ikoner i ett annat manér — saknas något, bidra till Lucide eller bygg det på deras primitiver.</div>
+      </div>
+    </div>
+
+    <!-- ══════════ 05 DOKUMENTMALL ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">05 — Dokumentmall</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Vårt eget brevpapper</h2>
+      <p style="margin:0;max-width:660px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Dokument som kommer från Klartex — offerter, avtal, rapporter, brev. Märket står överst, paletten används fullt ut och typografin är densamma som i resten av profilen. Ett företag som säljer satta dokument måste kunna sätta sina egna. A4 med 28 mm marginal och en spalt på cirka 68 tecken. Arket nedan är återgivet förminskat — texten är liten här därför att 10,5 pt är liten på ett A4.</p>
+    </div>
+
+    <div style="padding:36px 88px 0;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+      <div style="width:480px;background:#FFFFFF;border:1px solid #E3E1DB;padding:64px 64px 30px;display:flex;flex-direction:column;height:679px;box-sizing:border-box">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px">
+          <img src="klartex-lockup.svg" alt="klartex" style="width:121px;display:block">
+          <div style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:6.9px;line-height:1.9;color:#6B6A63">
+            OFFERT 2026-0117<br>14 APRIL 2026
+          </div>
+        </div>
+
+        <div style="margin-top:46px;font-family:'Source Serif 4',serif;font-size:8.5px;line-height:1.62;color:#14161A">
+          Nordvik Teknik<br>Att: Karin Lindqvist<br>Almvägen 12<br>118 45 Stockholm
+        </div>
+
+        <div style="margin-top:37px;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:17.7px;line-height:1.15;letter-spacing:-0.015em;color:#071A43">Uppsättning av ert dokumentflöde</div>
+
+        <div style="margin-top:18px;display:flex;flex-direction:column;gap:9px;font-family:'Source Serif 4',serif;font-size:8.5px;line-height:1.62;color:#14161A">
+          <div>Tack för samtalet den 8 april. Nedan följer vårt förslag på att flytta era offerter, rapporter och avtal till en gemensam mall som fylls automatiskt ur befintliga underlag.</div>
+          <div>Arbetet omfattar tre mallar, en engångsimport av 2024–2025 års handlingar samt utbildning för två personer hos er.</div>
+        </div>
+
+        <div style="margin-top:23px;border-top:1px solid #071A43;font-family:'Source Serif 4',serif;font-size:8.5px;line-height:1.5;color:#14161A">
+          <div style="display:flex;justify-content:space-between;padding:4.6px 0;border-bottom:1px solid #EFEDE7"><span>Mallutveckling, tre dokumenttyper</span><span style="font-family:'JetBrains Mono',monospace;font-size:8px">42 000 kr</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4.6px 0;border-bottom:1px solid #EFEDE7"><span>Import av befintliga handlingar</span><span style="font-family:'JetBrains Mono',monospace;font-size:8px">9 500 kr</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4.6px 0;border-bottom:1px solid #EFEDE7"><span>Utbildning, halvdag</span><span style="font-family:'JetBrains Mono',monospace;font-size:8px">6 000 kr</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5.5px 0;font-weight:600;color:#071A43"><span>Totalt exkl. moms</span><span style="font-family:'JetBrains Mono',monospace;font-size:8px">57 500 kr</span></div>
+        </div>
+
+        <div style="margin-top:27px;font-family:'Source Serif 4',serif;font-size:8.5px;line-height:1.62;color:#14161A">
+          Med vänlig hälsning
+          <div style="margin-top:27px;font-weight:600;color:#071A43">Johan Ek</div>
+          <div style="color:#6B6A63">Klartex AB</div>
+        </div>
+
+        <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-family:'Source Serif 4',serif;font-size:6.9px;letter-spacing:0.04em;color:#6B6A63">
+          <span>Klartex AB</span>
+          <span>559312-0044</span>
+          <span>Hornsgatan 4, 118 20 Stockholm</span>
+          <span>hej@klartex.se</span>
+          <span>1 (1)</span>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:24px">
+        <div style="border:1px solid #E3E1DB;background:#FFFFFF;padding:26px 30px;display:flex;flex-direction:column;gap:16px">
+          <span style="font-size:14px;font-weight:600">Sidmått</span>
+          <div style="display:flex;flex-direction:column;gap:9px;font-size:13.5px;line-height:1.5;color:#4A4943">
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Format</span><span>A4 · 210 × 297 mm</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Marginal</span><span>28 mm runt om</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Märkets bredd</span><span>53 mm, överst till vänster</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Radlängd</span><span>ca 68 tecken</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Bröd</span><span>Source Serif 4 · 10,5/17 pt</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Dokumentrubrik</span><span>Semibold 22 pt</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Referens &amp; belopp</span><span>JetBrains Mono</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Sidfot</span><span>8,5 pt · Grå 600</span></div>
+            <div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6B6A63">Sidfotens läge</span><span>13 mm från nederkant</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid #E3E1DB;background:#FFFFFF;padding:26px 30px;display:flex;flex-direction:column;gap:14px">
+          <span style="font-size:14px;font-weight:600">Regler</span>
+          <div style="display:flex;flex-direction:column;gap:11px;font-size:13.5px;line-height:1.55;color:#4A4943">
+            <div>Märket står överst till vänster med friyta enligt avsnitt 01. Ingen upprepning i sidfoten.</div>
+            <div>Marin 900 är rubrikfärgen. Accentblått används inte i tryckta dokument — de ska kunna kopieras i svartvitt utan att tappa något.</div>
+            <div>Tabeller får linjer över och under, aldrig runt varje cell. Summaraden markeras med Semibold, inte med bakgrund.</div>
+            <div>Belopp, datum och referensnummer skrivs i mono så att siffror linjerar mellan rader.</div>
+            <div>Sidfoten är sidfot, inte avslutning: den ligger utanför textytan, 13 mm från arkets nederkant, utan linje över sig. Uppgifterna sprids över hela textbredden i Grå 600 med sidnummer sist.</div>
+          </div>
+        </div>
+        <div style="border:1px solid #E3E1DB;background:#F2F1ED;padding:22px 26px;font-size:13px;line-height:1.55;color:#4A4943;text-wrap:pretty">
+          Mallen för dokument som <em>produkten</em> genererar åt kunder är en annan sak och specificeras i produktdokumentationen — den ska bära kundens identitet, inte vår.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 06 KOMPLEMENTGRAFIK ══════════ -->
+    <div style="padding:80px 88px 0;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#9A9891">06 — Komplementgrafik</div>
+      <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:38px;line-height:1.1;letter-spacing:-0.02em;color:#071A43">Bladet</h2>
+      <p style="margin:0;max-width:680px;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Symbolens två blå ytor — benet och armen — urklippta och uppförstorade tills bara ett svep syns. Formen är oförändrad; det enda som tillkommit är en linjär gradient som går till noll opacitet, så bladet tonar in i underlaget i stället för att sluta i en kant. Gradienten hålls mörk: bladet ska knappt skilja sig från marinen, mer en skiftning i ytan än en form ovanpå den.</p>
+    </div>
+
+    <div style="padding:36px 88px 0">
+      <div style="height:340px;background:#071A43;overflow:hidden;position:relative">
+        <img src="klartex-blad-arm.svg" alt="" style="position:absolute;left:-100px;top:10px;width:680px;display:block">
+        <img src="klartex-blad-omvant.svg" alt="" style="position:absolute;right:-130px;bottom:-110px;width:680px;display:block">
+      </div>
+    </div>
+
+    <div style="padding:24px 88px 0;display:flex;flex-wrap:wrap;gap:24px">
+      <div style="flex:1;min-width:420px;border:1px solid #E3E1DB;background:#FFFFFF;padding:26px 30px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px">
+          <span style="font-size:14px;font-weight:600">Visitkort · 85 × 55 mm</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9891">340 × 220</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px">
+          <div style="width:340px;height:220px;background:#FBFAF8;border:1px solid #E3E1DB;padding:26px;box-sizing:border-box;display:flex;flex-direction:column">
+            <img src="klartex-lockup.svg" alt="klartex" style="width:112px;display:block">
+            <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;gap:20px">
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:15px;font-weight:600;color:#071A43">Johan Ek</span>
+                <span style="font-size:13px;color:#6B6A63">Grundare</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.7;color:#6B6A63">
+                <span>johan@klartex.se</span>
+                <span>070 412 88 03</span>
+              </div>
+            </div>
+          </div>
+          <div style="width:340px;height:220px;background:#071A43;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center">
+            <img src="klartex-blad-arm.svg" alt="" style="position:absolute;left:-60px;top:-6px;width:360px;display:block">
+        <img src="klartex-blad-omvant.svg" alt="" style="position:absolute;right:-70px;bottom:-60px;width:340px;display:block">
+            <img src="klartex-lockup-reverse.svg" alt="klartex" style="position:relative;width:168px;display:block">
+          </div>
+        </div>
+        <div style="font-size:13px;line-height:1.55;color:#6B6A63;text-wrap:pretty">Framsidan bär personen och trycks på papper. Baksidan bär märket på marin, med bladen utfallande i motsatta hörn. Kontakten skrivs i mono så att siffrorna linjerar.</div>
+      </div>
+
+      <div style="flex:1;min-width:300px;border:1px solid #E3E1DB;background:#FFFFFF;padding:26px 30px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:14px;font-weight:600">Regler</span>
+        <div style="display:flex;flex-direction:column;gap:11px;font-size:13.5px;line-height:1.55;color:#4A4943">
+          <div>Bladen används i par, i diagonalt motsatta hörn, alltid utfallande. Mellan dem uppstår symbolens veck utan att det ritas.</div>
+          <div>Armens gradient är lodrät och börjar i bakgrundsfärgen nedtill; benets följer sin egen lutning. Riktningen väljs så att den täta änden aldrig hamnar vid en kant där den skulle läsa som ett snitt.</div>
+          <div>Underlaget är Marin 900 eller Marin 700. På papper krävs en marin platta att tona in mot.</div>
+          <div>Text får ligga i fältet men aldrig över en tät del. Logotypen i negativ är undantaget — den tål bladet eftersom gradienten är mörk.</div>
+          <div>Bladen skalas fritt men roteras eller speglas aldrig.</div>
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6B6A63">
+          <span style="border:1px solid #E3E1DB;padding:4px 8px">klartex-blad.svg</span>
+          <span style="border:1px solid #E3E1DB;padding:4px 8px">klartex-blad-omvant.svg</span>
+          <span style="border:1px solid #E3E1DB;padding:4px 8px">klartex-blad-arm.svg</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:72px 88px 80px">
+      <div style="border-top:1px solid #E3E1DB;padding-top:22px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:16px">
+        <span style="font-size:13px;color:#9A9891">Klartex grafisk profil · version 1.0 · augusti 2026</span>
+        <img src="klartex-lockup.svg" alt="klartex" style="width:118px;display:block;opacity:0.7">
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

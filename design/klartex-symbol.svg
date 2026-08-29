@@ -1,0 +1,56 @@
+<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="610" height="675" viewBox="490 150 610 675" role="img" aria-labelledby="title desc">
+  <title id="title">Klartex symbol</title>
+  <desc id="desc">Abstract folded ribbon symbol in dark navy and vivid blue.</desc>
+
+  <defs>
+    
+    <path id="silhouette" d="       M 1078 806.61       C 1087.63 818.11, 921.93 790.39, 877 736.7115       L 761.30 598.45       A 33 33 0 0 0 713.98207 595.05       L 567.01 726.59       A 33 33 0 0 1 512 702       L 512 312.78       C 512 255, 565 215, 676 166       L 676 381.92614       A 84 84 0 0 1 648.01992 444.51823       L 522.99 556.42       A 33 33 0 0 0 567.01 605.59       L 728.10736 461.40792       A 84 84 0 0 1 784.12728 440       L 887.22230 440       L 772.13849 543       C 825 543, 860.70 547, 880 570       L 1078 806.61 Z"></path>
+
+    <clipPath id="silhouetteClip">
+      <use href="#silhouette"></use>
+    </clipPath>
+
+    <linearGradient id="navy" x1="676" y1="166" x2="557" y2="735" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071a43"></stop>
+      <stop offset="0.44" stop-color="#081f4c"></stop>
+      <stop offset="0.72" stop-color="#05163c"></stop>
+      <stop offset="1" stop-color="#09204e"></stop>
+    </linearGradient>
+
+    <radialGradient id="navyLift" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(614 337) rotate(100) scale(257 177)">
+      <stop offset="0" stop-color="#0b2b65" stop-opacity="0.82"></stop>
+      <stop offset="1" stop-color="#0b2b65" stop-opacity="0"></stop>
+    </radialGradient>
+
+    <linearGradient id="rightBlue" x1="772" y1="543" x2="1078" y2="807" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#092f78"></stop>
+      <stop offset="0.38" stop-color="#0849b8"></stop>
+      <stop offset="0.72" stop-color="#0762ec"></stop>
+      <stop offset="1" stop-color="#0870ff"></stop>
+    </linearGradient>
+
+    <linearGradient id="upperBlue" x1="619" y1="559" x2="887" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#092f78"></stop>
+      <stop offset="0.34" stop-color="#0847b2"></stop>
+      <stop offset="0.68" stop-color="#0762eb"></stop>
+      <stop offset="1" stop-color="#0870ff"></stop>
+    </linearGradient>
+
+    <radialGradient id="foldShade" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(716 565) rotate(150) scale(180 125)">
+      <stop offset="0" stop-color="#010b2e" stop-opacity="0.88"></stop>
+      <stop offset="0.72" stop-color="#021038" stop-opacity="0.34"></stop>
+      <stop offset="1" stop-color="#021038" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+
+  
+  <use href="#silhouette" fill="url(#navy)"></use>
+  <path clip-path="url(#silhouetteClip)" fill="url(#navyLift)" d="M490 150H720V755H490Z"></path>
+  <path clip-path="url(#silhouetteClip)" fill="url(#foldShade)" d="M500 430H850V750H500Z"></path>
+
+  
+  <path clip-path="url(#silhouetteClip)" fill="url(#rightBlue)" d="     M 772.13849 543     C 825 543, 860.70 547, 880 570     L 1078 806.61     C 1087.63 818.11, 921.93 790.39, 877 736.7115     L 761.30 598.45     A 33 33 0 0 0 713.98207 595.05     L 772.13849 543 Z"></path>
+
+  
+  <path clip-path="url(#silhouetteClip)" fill="url(#upperBlue)" d="     M 619.05957 559.00569     C 628.00129 551.00285, 642.94302 543, 658.94302 543     L 772.13849 543     L 887.22230 440     L 784.12728 440     A 84 84 0 0 0 728.10736 461.40792     L 619.05957 559.00569 Z"></path>
+</svg>

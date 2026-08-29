@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Archivo:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&family=EB+Garamond:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #E9E7E2; }
+  a { color: #9E3B22; text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { color: #1A1814; }
+</style>
+</helmet>
+
+<section style="padding:72px 80px 110px;font-family:'Instrument Sans',system-ui,sans-serif;color:#0B1220;background:#FFFFFF">
+
+  <div style="max-width:900px;display:flex;flex-direction:column;gap:14px;margin-bottom:40px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8577">Omgång 5 · 4a som konturer</div>
+    <h1 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:46px;line-height:1.05;letter-spacing:-0.02em">Lockupen utan typsnittsberoende</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;max-width:680px;color:#54503F;text-wrap:pretty">Ordmärket är konverterat till riktiga konturer ur Source Serif 4 Semibold — kvadratiska bézierkurvor direkt ur fontens glyf-tabell, ingen trace. Instansen är Display (opsz 60) — samma som webbläsaren väljer vid displaygrad, och nu fastlåst i CSS så att lockupen har identiska proportioner i alla storlekar. Kerningen är fontens egna advance-bredder med −0,02 em tracking. Symbolen ligger inbakad i samma fil med 4a-metriken.</p>
+  </div>
+
+  <div style="border:1px solid #E7E4DE;display:flex;flex-direction:column;margin-bottom:26px">
+    <div style="padding:64px 56px;display:flex;justify-content:center">
+      <img src="klartex-lockup.svg" alt="klartex" style="width:100%;max-width:760px;display:block">
+    </div>
+    <div style="background:#071A43;padding:52px 56px;display:flex;justify-content:center">
+      <img src="klartex-lockup-reverse.svg" alt="klartex" style="width:100%;max-width:520px;display:block">
+    </div>
+    <div style="padding:38px 56px;display:flex;align-items:center;justify-content:center;gap:56px;flex-wrap:wrap;border-top:1px solid #E7E4DE">
+      <img src="klartex-lockup.svg" alt="" style="width:260px;display:block">
+      <img src="klartex-lockup.svg" alt="" style="width:150px;display:block">
+      <img src="klartex-lockup.svg" alt="" style="width:92px;display:block">
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px">
+    <div style="width:430px;border:1px solid #E7E4DE;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:13px;font-weight:600">Filerna</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#54503F;line-height:1.5">
+        <span>klartex-lockup.svg <span style="color:#A8A296">— 4168 × 1043</span></span>
+        <span>klartex-lockup-reverse.svg</span>
+        <span>klartex-wordmark.svg <span style="color:#A8A296">— 2780 × 751</span></span>
+        <span>klartex-symbol-v2.svg <span style="color:#A8A296">— 569 × 646</span></span>
+        <span>klartex-symbol-v2-reverse.svg</span>
+      </div>
+    </div>
+
+    <div style="width:430px;border:1px solid #E7E4DE;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:13px;font-weight:600">Ordmärket ensamt</div>
+      <img src="klartex-wordmark.svg" alt="klartex" style="width:230px;display:block">
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">Beskuren till bläck. Baslinjen ligger på y = 0 i filens koordinatsystem, så den kan placeras mot annan typografi utan gissningar.</div>
+    </div>
+
+    <div style="width:430px;border:1px solid #E7E4DE;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:13px;font-weight:600">Överhänget mot baslinjen</div>
+      <div style="font-size:13px;line-height:1.55;color:#54503F;text-wrap:pretty">Ur fonten: e och a går 13 enheter av 1000 under baslinjen. Symbolens fot ligger vid +3 % på 4 enheter under. Exakt samma överhäng som ett e ger +4 % — en siffra bort om du vill ha det.</div>
+    </div>
+  </div>
+
+</section>
+
+<section style="padding:72px 80px 110px;font-family:'Instrument Sans',system-ui,sans-serif;color:#0B1220;background:#F7F6F3">
+
+  <div style="max-width:900px;display:flex;flex-direction:column;gap:14px;margin-bottom:44px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8577">Omgång 4 · låst lockup</div>
+    <h1 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:46px;line-height:1.05;letter-spacing:-0.02em">Symbolens mitt på x-höjden — utan att röra formen</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;max-width:680px;color:#54503F;text-wrap:pretty">Rättelse: i första försöket kortade jag av den övre stapeln i själva pathen. Det är återställt — kurvorna är nu byte för byte identiska med filen du gav mig. Det enda som ändrats är viewBoxen, som är beskuren till exakt bläck (569 × 646 i stället för 610 × 675 med luft runt om). Balansen mot x:et löses i stället i placeringen: skala symbolen tills armens överkant ligger på x-höjden och benets fot på baslinjen. Priset är att stapeln då går över ordets ascender — det är <a href="#4a">4a</a>. <a href="#4b">4b</a> gör tvärtom och håller symbolen inom ascendern.</p>
+  </div>
+
+  <div style="background:#FFFFFF;border:1px solid #E2DFD7;padding:34px 40px 30px;margin-bottom:26px;display:flex;flex-direction:column;gap:26px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8577">Samma form, tre skalningar · linjerna är ordets x-höjd och baslinje</div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#B0AA9B;font-family:'JetBrains Mono',monospace">omgång 3 — symbolen satt på höjd, inte på metrik</div>
+      <div style="overflow:hidden;padding:26px 0 34px">
+        <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:72px;letter-spacing:-0.02em;color:#071A43;line-height:1;justify-content:center">
+          <span style="position:relative">klartex<span style="position:absolute;left:-16px;right:-91px;top:0.3995em;height:1.5px;background:#F0A93B"></span><span style="position:absolute;left:-16px;right:-91px;top:0.8542em;height:1.5px;background:#F0A93B"></span></span>
+          <img src="klartex-symbol.svg" alt="" style="height:0.86em;display:block">
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.5;color:#8A8577;text-wrap:pretty">Symbolen är satt på ögonmått: den svävar ungefär 0,11 em ovanför baslinjen och dess x-band är smalare än ordets, så armen och foten binder inte i någon av linjerna. Märket flyter i stället för att sitta.</div>
+    </div>
+
+    <div style="height:1px;background:#EDEBE4"></div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#0870FF;font-family:'JetBrains Mono',monospace;font-weight:700">4a — x-bandet låst till ordets x-höjd</div>
+      <div style="overflow:hidden;padding:26px 0 34px">
+        <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:72px;letter-spacing:-0.02em;color:#071A43;line-height:1;justify-content:center">
+          <span style="position:relative">klartex<span style="position:absolute;left:-16px;right:-102px;top:0.3995em;height:1.5px;background:#F0A93B"></span><span style="position:absolute;left:-16px;right:-102px;top:0.8542em;height:1.5px;background:#F0A93B"></span></span>
+          <img src="klartex-symbol-v2.svg" alt="" style="height:1.043em;display:block;transform:translateY(0.132em)">
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.5;color:#8A8577;text-wrap:pretty">Armens överkant på x-höjden och stapelfoten vilande på baslinjen utan överhäng. Svansen går längre ned, som en descender. Stapeln reser sig över ascendern — symbolen blir ett sigill snarare än en bokstav i ordet.</div>
+    </div>
+
+    <div style="height:1px;background:#EDEBE4"></div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#54503F;font-family:'JetBrains Mono',monospace;font-weight:700">4b — höjden låst till ordets ascender</div>
+      <div style="overflow:hidden;padding:26px 0 34px">
+        <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:72px;letter-spacing:-0.02em;color:#071A43;line-height:1;justify-content:center">
+          <span style="position:relative">klartex<span style="position:absolute;left:-16px;right:-89px;top:0.3995em;height:1.5px;background:#F0A93B"></span><span style="position:absolute;left:-16px;right:-89px;top:0.8542em;height:1.5px;background:#F0A93B"></span></span>
+          <img src="klartex-symbol-v2.svg" alt="" style="height:0.845em;display:block;transform:translateY(0.115em)">
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.5;color:#8A8577;text-wrap:pretty">Sitter lugnt i raden och ryms i låga headers, men armen hamnar under x-höjden igen. Det här är kompromissen om lockupen ska bete sig som text.</div>
+    </div>
+  </div>
+
+  <div id="4a" style="background:#FFFFFF;border:1px solid #E2DFD7;margin-bottom:26px;display:flex;flex-direction:column">
+    <div style="padding:20px 26px 18px;border-bottom:1px solid #EDEBE4;display:flex;align-items:center;gap:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#071A43;color:#FFFFFF;padding:3px 7px">4a</span>
+      <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Sigillet — symbolhöjd 1,043 × grad</span>
+    </div>
+    <div style="padding:56px 26px;display:flex;align-items:center;justify-content:center">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:80px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:1.043em;display:block;transform:translateY(0.132em)">
+      </div>
+    </div>
+    <div style="background:#071A43;padding:44px 26px;display:flex;align-items:center;justify-content:center">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:56px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2-reverse.svg" alt="Klartex" style="height:1.043em;display:block;transform:translateY(0.132em)">
+      </div>
+    </div>
+    <div style="padding:34px 26px;display:flex;align-items:baseline;justify-content:center;gap:52px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:36px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:1.043em;display:block;transform:translateY(0.132em)">
+      </div>
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:22px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:1.043em;display:block;transform:translateY(0.132em)">
+      </div>
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:14px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:1.043em;display:block;transform:translateY(0.132em)">
+      </div>
+    </div>
+  </div>
+
+  <div id="4b" style="background:#FFFFFF;border:1px solid #E2DFD7;margin-bottom:26px;display:flex;flex-direction:column">
+    <div style="padding:20px 26px 18px;border-bottom:1px solid #EDEBE4;display:flex;align-items:center;gap:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0870FF;color:#FFFFFF;padding:3px 7px">4b</span>
+      <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Textvarianten — symbolhöjd 0,845 × grad</span>
+    </div>
+    <div style="padding:56px 26px;display:flex;align-items:center;justify-content:center">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:80px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:0.845em;display:block;transform:translateY(0.115em)">
+      </div>
+    </div>
+    <div style="background:#071A43;padding:44px 26px;display:flex;align-items:center;justify-content:center">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:56px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2-reverse.svg" alt="Klartex" style="height:0.845em;display:block;transform:translateY(0.115em)">
+      </div>
+    </div>
+    <div style="padding:34px 26px;display:flex;align-items:baseline;justify-content:center;gap:52px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:36px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:0.845em;display:block;transform:translateY(0.115em)">
+      </div>
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:22px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:0.845em;display:block;transform:translateY(0.115em)">
+      </div>
+      <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:14px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+        <span>klartex</span>
+        <img src="klartex-symbol-v2.svg" alt="Klartex" style="height:0.845em;display:block;transform:translateY(0.115em)">
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px">
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Symbolen ensam, beskuren viewBox</div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <img src="klartex-symbol-v2.svg" alt="" style="height:48px;display:block">
+        <img src="klartex-symbol-v2.svg" alt="" style="height:32px;display:block">
+        <img src="klartex-symbol-v2.svg" alt="" style="height:20px;display:block">
+        <span style="background:#071A43;padding:8px;display:flex;align-items:flex-end;gap:12px"><img src="klartex-symbol-v2-reverse.svg" alt="" style="height:32px;display:block"><img src="klartex-symbol-v2-reverse.svg" alt="" style="height:20px;display:block"></span>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">569 × 646, ingen luft. Identisk path som din fil — bara ramen är beskuren.</div>
+    </div>
+
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Sidfot i kundens offert · 4b</div>
+      <div style="border-top:1px solid #E2DFD7;padding-top:11px;display:flex;justify-content:space-between;align-items:baseline;font-family:'Source Serif 4',serif;font-size:12px;color:#8A8577;line-height:1">
+        <span>Nordvik Teknik · Offert 2026-041 Kvarnholmen · sid 3 av 7</span>
+        <span style="display:flex;align-items:baseline;gap:0.3em;color:#54503F">satt med klartex<img src="klartex-symbol-v2.svg" alt="" style="height:0.845em;display:block;transform:translateY(0.115em)"></span>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">I löpande text vinner textvarianten — sigillet skulle spränga radhöjden.</div>
+    </div>
+
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Webbappens header · 4b</div>
+      <div style="border:1px solid #E9E6DF;display:flex;flex-direction:column">
+        <div style="height:48px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E9E6DF">
+          <div style="display:flex;align-items:baseline;gap:0.48em;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:20px;letter-spacing:-0.02em;color:#071A43;line-height:1">
+            <span>klartex</span>
+            <img src="klartex-symbol-v2.svg" alt="" style="height:0.845em;display:block;transform:translateY(0.115em)">
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:#8A8577"><span>Dokument</span><span>Mallar</span><span>API</span></div>
+        </div>
+        <div style="height:60px;background:#FBFAF7"></div>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">Min rekommendation: <a href="#4a">4a</a> som primärmärke, <a href="#4b">4b</a> som textvariant under ca 24 px grad.</div>
+    </div>
+  </div>
+
+</section>
+
+<section style="padding:72px 80px 110px;font-family:'Instrument Sans',system-ui,sans-serif;color:#0B1220;background:#F7F6F3">
+
+  <div style="max-width:900px;display:flex;flex-direction:column;gap:14px;margin-bottom:44px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8577">Omgång 3 · Source Serif 4, symbolen till höger</div>
+    <h1 style="margin:0;font-family:'Source Serif 4',serif;font-weight:600;font-size:46px;line-height:1.05;letter-spacing:-0.02em">Symbolen som slutpunkt</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;max-width:660px;color:#54503F;text-wrap:pretty">Till höger läses symbolen som en signatur — sigillet efter namnet, inte ikonen före det. Det passar en serif: ordet är avsändaren, märket är stämpeln. Två varianter av samma idé — <a href="#3a">3a</a> med symbolen i versalhöjd, <a href="#3b">3b</a> med den nedskalad till x-höjd som ett avslutande tecken.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px;margin-bottom:34px">
+
+    <!-- 3a -->
+    <div id="3a" style="width:660px;background:#FFFFFF;border:1px solid #E2DFD7;display:flex;flex-direction:column">
+      <div style="padding:20px 26px 18px;border-bottom:1px solid #EDEBE4;display:flex;align-items:center;gap:12px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#071A43;color:#FFFFFF;padding:3px 7px">3a</span>
+        <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Versalhöjd — symbolen väger lika mycket som ordet</span>
+      </div>
+      <div style="height:200px;display:flex;align-items:center;justify-content:center;gap:22px">
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:60px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+        <img src="klartex-symbol.svg" alt="Klartex" style="height:62px;display:block">
+      </div>
+      <div style="height:120px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:38px">
+        <div style="display:flex;align-items:center;gap:13px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:34px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:36px;display:block">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:19px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:20px;display:block">
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:13px;display:block">
+        </div>
+      </div>
+      <div style="padding:18px 26px 20px;font-size:13px;line-height:1.55;color:#6E6A5C;text-wrap:pretty">Symbolens höjd = versalhöjden i ordmärket. Tydligast hierarki, tål att stå ensamt på en framsida. Kräver mest bredd.</div>
+    </div>
+
+    <!-- 3b -->
+    <div id="3b" style="width:660px;background:#FFFFFF;border:1px solid #E2DFD7;display:flex;flex-direction:column">
+      <div style="padding:20px 26px 18px;border-bottom:1px solid #EDEBE4;display:flex;align-items:center;gap:12px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0870FF;color:#FFFFFF;padding:3px 7px">3b</span>
+        <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">X-höjd — symbolen som avslutande tecken</span>
+      </div>
+      <div style="height:200px;display:flex;align-items:center;justify-content:center;gap:14px">
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:60px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+        <img src="klartex-symbol.svg" alt="Klartex" style="height:38px;display:block;transform:translateY(4px)">
+      </div>
+      <div style="height:120px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:38px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:34px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:22px;display:block;transform:translateY(2px)">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:19px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:13px;display:block;transform:translateY(1px)">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:9px;display:block">
+        </div>
+      </div>
+      <div style="padding:18px 26px 20px;font-size:13px;line-height:1.55;color:#6E6A5C;text-wrap:pretty">Symbolen bunden till x-höjden — läses som en del av ordet, nästan som interpunktion. Kompaktare, mer sammanhållet, svagare som fristående ikon.</div>
+    </div>
+
+  </div>
+
+  <div style="background:#FFFFFF;border:1px solid #E2DFD7;padding:26px 30px 30px;margin-bottom:34px;display:flex;flex-direction:column;gap:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8577">Höger mot vänster, samma storlek</div>
+    <div style="display:flex;flex-wrap:wrap;gap:30px">
+      <div style="flex:1;min-width:260px;border:1px solid #EDEBE4;padding:26px;display:flex;align-items:center;justify-content:center;gap:18px">
+        <img src="klartex-symbol.svg" alt="" style="height:46px;display:block">
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:44px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="flex:1;min-width:260px;border:1.5px solid #071A43;padding:26px;display:flex;align-items:center;justify-content:center;gap:18px">
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:44px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+        <img src="klartex-symbol.svg" alt="" style="height:46px;display:block">
+      </div>
+    </div>
+    <div style="font-size:13px;line-height:1.55;color:#6E6A5C;max-width:620px;text-wrap:pretty">Vänster ger märket ett ankare och fungerar bättre i en app-header där ikonen ensam ska kunna stå kvar när ordet försvinner. Höger ger en signatur och sitter naturligt i sidfot, försättsblad och e-postavslut.</div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px">
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Sidfot i kundens offert</div>
+      <div style="border-top:1px solid #E2DFD7;padding-top:11px;display:flex;justify-content:space-between;align-items:center;font-family:'Source Serif 4',serif;font-size:12px;color:#8A8577">
+        <span>Nordvik Teknik · Offert 2026-041 Kvarnholmen · sid 3 av 7</span>
+        <span style="display:flex;align-items:center;gap:5px;color:#54503F">satt med klartex<img src="klartex-symbol.svg" alt="" style="height:12px;display:block"></span>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">Här vinner högerplaceringen: märket blir det sista ögat möter, som ett sigill.</div>
+    </div>
+
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Webbappens header</div>
+      <div style="border:1px solid #E9E6DF;display:flex;flex-direction:column">
+        <div style="height:48px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E9E6DF">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:18px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+            <img src="klartex-symbol.svg" alt="" style="height:19px;display:block">
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:#8A8577"><span>Dokument</span><span>Mallar</span><span>API</span></div>
+        </div>
+        <div style="height:60px;background:#FBFAF7"></div>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">Fungerar, men headern förlorar sitt vänsterankare. Överväg vänsterlockup enbart här.</div>
+    </div>
+
+    <div style="width:430px;background:#FFFFFF;border:1px solid #E2DFD7;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:13px;font-weight:600">Symbolen ensam, alla storlekar</div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <img src="klartex-symbol.svg" alt="" style="height:48px;display:block">
+        <img src="klartex-symbol.svg" alt="" style="height:32px;display:block">
+        <img src="klartex-symbol.svg" alt="" style="height:24px;display:block">
+        <img src="klartex-symbol.svg" alt="" style="height:16px;display:block">
+        <span style="background:#071A43;padding:8px;display:flex;align-items:flex-end;gap:12px"><img src="klartex-symbol-reverse.svg" alt="" style="height:32px;display:block"><img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block"></span>
+      </div>
+      <div style="font-size:12px;line-height:1.5;color:#8A8577;text-wrap:pretty">Favicon och app-ikon använder symbolen ensam, alltid negativ på marinblå platta.</div>
+    </div>
+  </div>
+
+</section>
+
+<section style="padding:72px 80px 110px;font-family:'Instrument Sans',system-ui,sans-serif;color:#0B1220;background:#EDEEF0">
+
+  <div style="max-width:900px;display:flex;flex-direction:column;gap:14px;margin-bottom:44px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#7C8494">Omgång 2 · symbolen är låst, typsnittet är frågan</div>
+    <h1 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:44px;line-height:1.1;letter-spacing:-0.03em">Din k-symbol mot sex röster</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;max-width:660px;color:#4B5364;text-wrap:pretty">Symbolen är ett vikt band som formar ett gement k — geometriskt, riktat, med en gradient från marinblått till klarblått. Den vill ha ett ordmärke som inte konkurrerar: låg kontrast i strecket, öppna former, tight tracking. Nedan samma lockup i sex typsnitt, var och en i ljust och mörkt läge. Peka ut en — <a href="#2a">2a</a> till <a href="#2f">2f</a>.</p>
+  </div>
+
+  <div style="background:#FFFFFF;border:1px solid #DDE0E5;padding:30px 34px;margin-bottom:34px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:46px">
+    <div style="display:flex;align-items:flex-end;gap:34px">
+      <img src="klartex-symbol.svg" alt="Klartex symbol" style="height:132px;display:block">
+      <img src="klartex-symbol.svg" alt="" style="height:64px;display:block">
+      <img src="klartex-symbol.svg" alt="" style="height:32px;display:block">
+      <img src="klartex-symbol.svg" alt="" style="height:16px;display:block">
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:22px;background:#071A43;padding:22px 26px;margin-left:auto">
+      <img src="klartex-symbol-reverse.svg" alt="" style="height:64px;display:block">
+      <img src="klartex-symbol-reverse.svg" alt="" style="height:32px;display:block">
+      <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px">
+
+    <!-- 2a Archivo -->
+    <div id="2a" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0B1220;color:#FFFFFF;padding:3px 7px">2a</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Archivo</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Kompakt grotesk med hög x-höjd. Tätast av alla — ordmärket blir ett block som balanserar symbolens massa.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:46px;letter-spacing:-0.04em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:23px;letter-spacing:-0.04em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:13px;letter-spacing:-0.04em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.04em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Stark i UI och på knappar. Minst särprägel — läses som vilken dev-tool som helst.</div>
+      </div>
+    </div>
+
+    <!-- 2b Space Grotesk -->
+    <div id="2b" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0870FF;color:#FFFFFF;padding:3px 7px">2b</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Space Grotesk</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Avhuggna terminaler och ett kantigt a. Delar symbolens vinklade snitt utan att härma den.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:46px;letter-spacing:-0.025em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:23px;letter-spacing:-0.025em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:-0.025em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.025em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Mest karaktär per bokstav. Risken är att den daterar sig — den är tidens typsnitt.</div>
+      </div>
+    </div>
+
+    <!-- 2c IBM Plex Sans -->
+    <div id="2c" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0B1220;color:#FFFFFF;padding:3px 7px">2c</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">IBM Plex Sans</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Infrastrukturens typsnitt. Lätt teknisk kyla, men med tillräcklig värme för ett dokument.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:46px;letter-spacing:-0.025em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:23px;letter-spacing:-0.025em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:13px;letter-spacing:-0.025em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:16px;letter-spacing:-0.025em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Har en mono och en serif i samma familj — hela profilen kan byggas ur ett släkte.</div>
+      </div>
+    </div>
+
+    <!-- 2d Manrope -->
+    <div id="2d" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0870FF;color:#FFFFFF;padding:3px 7px">2d</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Manrope</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Halvgeometrisk och rund. Mjukar upp symbolens skarpa vinklar — mest tillgänglig av de sex.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'Manrope',sans-serif;font-weight:800;font-size:45px;letter-spacing:-0.035em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'Manrope',sans-serif;font-weight:800;font-size:23px;letter-spacing:-0.035em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'Manrope',sans-serif;font-weight:800;font-size:13px;letter-spacing:-0.035em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'Manrope',sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.035em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Vänligast mot en icke-teknisk beställare. Tappar en del teknisk auktoritet i gengäld.</div>
+      </div>
+    </div>
+
+    <!-- 2e Source Serif 4 -->
+    <div id="2e" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0B1220;color:#FFFFFF;padding:3px 7px">2e</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Source Serif 4</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Enda kontrastvalet: en modern serif mot en geometrisk symbol. Säger dokument, inte verktyg.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:48px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:24px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:14px;letter-spacing:-0.02em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:17px;letter-spacing:-0.02em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Bäst i sidfoten på en offert. Spänningen mot symbolen är avsiktlig men skör.</div>
+      </div>
+    </div>
+
+    <!-- 2f JetBrains Mono -->
+    <div id="2f" style="width:430px;background:#FFFFFF;border:1px solid #DDE0E5;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 16px;border-bottom:1px solid #EBEDF0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#0870FF;color:#FFFFFF;padding:3px 7px">2f</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">JetBrains Mono</span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#5C6474;text-wrap:pretty">Fast teckenbredd. Ordmärket blir en kommandorad — tydligast avsändare mot utvecklare.</p>
+      </div>
+      <div style="height:150px;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 22px">
+        <img src="klartex-symbol.svg" alt="" style="height:56px;display:block">
+        <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:38px;letter-spacing:-0.05em;color:#071A43;line-height:1">klartex</div>
+      </div>
+      <div style="height:96px;background:#071A43;display:flex;align-items:center;justify-content:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:28px;display:block">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:20px;letter-spacing:-0.05em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;letter-spacing:-0.05em;color:#FFFFFF;line-height:1">klartex</div>
+        </div>
+      </div>
+      <div style="padding:16px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #EBEDF0">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+          <img src="klartex-symbol.svg" alt="" style="height:34px;display:block">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:-0.05em;color:#071A43;line-height:1">klartex</div>
+        </div>
+        <div style="font-size:12px;line-height:1.5;color:#7C8494;flex:1;text-wrap:pretty">Bra som teknisk röst i profilen — men för smal för att bära hela varumärket.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:44px;background:#FFFFFF;border:1px solid #DDE0E5;padding:26px 30px;display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start">
+    <div style="max-width:330px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#7C8494">Min rekommendation</div>
+      <div style="font-size:15px;line-height:1.55;color:#4B5364;text-wrap:pretty"><a href="#2c">2c</a> som bärande röst — Plex har mono och serif i samma familj, så dokumentmallarna, webbappen och CLI:t kan hämta allt ur ett släkte. <a href="#2b">2b</a> om du vill att märket ska sticka ut mer än det ska åldras väl.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#7C8494">Färg ur symbolen</div>
+      <div style="display:flex;gap:8px">
+        <div style="width:64px;height:44px;background:#071A43"></div>
+        <div style="width:64px;height:44px;background:#0B2B65"></div>
+        <div style="width:64px;height:44px;background:#0849B8"></div>
+        <div style="width:64px;height:44px;background:#0870FF"></div>
+        <div style="width:64px;height:44px;background:#EDEEF0;border:1px solid #DDE0E5"></div>
+      </div>
+      <div style="display:flex;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#7C8494">
+        <span style="width:64px">071A43</span><span style="width:64px">0B2B65</span><span style="width:64px">0849B8</span><span style="width:64px">0870FF</span><span style="width:64px">EDEEF0</span>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<section style="padding:72px 80px 120px;font-family:'Instrument Sans',system-ui,sans-serif;color:#1A1814;background:#E9E7E2">
+
+  <div style="max-width:900px;display:flex;flex-direction:column;gap:14px;margin-bottom:56px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8377">Omgång 1 · logotyp</div>
+    <h1 style="margin:0;font-family:'Source Serif 4',serif;font-weight:600;font-size:44px;line-height:1.1;letter-spacing:-0.015em">Fyra riktningar för klartex</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;max-width:640px;color:#4A463E;text-wrap:pretty">Alla fyra är ordmärke i gemener plus fristående symbol. Två av dem bär dessutom ett typografiskt grepp inne i ordet. Säg vilken vi går vidare med — <a href="#1a">1a</a>, <a href="#1b">1b</a>, <a href="#1c">1c</a> eller <a href="#1d">1d</a> — eller be om en korsning.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:36px">
+
+    <!-- ============ 1a Satsytan ============ -->
+    <div id="1a" style="width:660px;background:#FFFFFF;border:1px solid #D6D3CC;display:flex;flex-direction:column">
+      <div style="padding:22px 26px 20px;border-bottom:1px solid #E7E4DE;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#1A1814;color:#F4F1EA;padding:3px 7px">1a</span>
+          <span style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Satsytan</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#5C574D;text-wrap:pretty">Märket är en satsyta: rubrik, brödtext och en rad i avvikande färg — ändringsmarkeringen. Boktypografiskt arv utan TeX-nostalgi.</p>
+      </div>
+
+      <div style="position:relative;height:250px;background:#F4F1EA;display:flex;align-items:center;justify-content:center;gap:26px">
+        <sc-if value="{{ visaKonstruktion }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:143px;height:1px;background:rgba(158,59,34,0.35)"></div>
+          <div style="position:absolute;left:0;right:0;top:104px;height:1px;background:rgba(158,59,34,0.2)"></div>
+        </sc-if>
+        <div style="width:52px;height:64px;border:1.5px solid #1A1814;padding:6px 5px;display:flex;flex-direction:column;gap:5px;box-sizing:border-box">
+          <div style="height:7px;width:70%;background:#1A1814"></div>
+          <div style="height:3px;width:100%;background:#1A1814"></div>
+          <div style="height:3px;width:100%;background:#9E3B22"></div>
+          <div style="height:3px;width:56%;background:#1A1814"></div>
+        </div>
+        <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:58px;letter-spacing:-0.025em;color:#1A1814;line-height:1">klartex</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #E7E4DE">
+        <div style="height:110px;background:#1A1814;display:flex;align-items:center;justify-content:center">
+          <div style="width:44px;height:54px;border:1.5px solid #F4F1EA;padding:5px 4px;display:flex;flex-direction:column;gap:4px;box-sizing:border-box">
+            <div style="height:6px;width:70%;background:#F4F1EA"></div>
+            <div style="height:2.5px;width:100%;background:#F4F1EA"></div>
+            <div style="height:2.5px;width:100%;background:#C9704F"></div>
+            <div style="height:2.5px;width:56%;background:#F4F1EA"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;border-left:1px solid #E7E4DE;border-right:1px solid #E7E4DE;display:flex;align-items:center;justify-content:center;gap:10px">
+          <div style="width:20px;height:24px;border:1px solid #1A1814;padding:2px 2px;display:flex;flex-direction:column;gap:2px;box-sizing:border-box">
+            <div style="height:3px;width:70%;background:#1A1814"></div>
+            <div style="height:1.5px;width:100%;background:#1A1814"></div>
+            <div style="height:1.5px;width:100%;background:#9E3B22"></div>
+          </div>
+          <div style="width:14px;height:16px;border:1px solid #1A1814;padding:1.5px;display:flex;flex-direction:column;gap:1.5px;box-sizing:border-box">
+            <div style="height:2.5px;width:70%;background:#1A1814"></div>
+            <div style="height:1px;width:100%;background:#1A1814"></div>
+            <div style="height:1px;width:100%;background:#9E3B22"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;display:flex;align-items:center;justify-content:center">
+          <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:24px;letter-spacing:-0.025em;color:#1A1814">klartex</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 26px 22px;border-top:1px solid #E7E4DE;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;height:34px;background:#F4F1EA;border:1px solid #E0DCD3"></div>
+          <div style="flex:1;height:34px;background:#1A1814"></div>
+          <div style="flex:1;height:34px;background:#9E3B22"></div>
+          <div style="flex:1;height:34px;background:#8A8377"></div>
+        </div>
+        <div style="display:flex;gap:24px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8377;letter-spacing:0.02em">
+          <span>#F4F1EA papper</span><span>#1A1814 bläck</span><span>#9E3B22 tegel</span><span>#8A8377 grå</span>
+        </div>
+        <div style="font-size:13px;line-height:1.5;color:#5C574D">Typografi: <strong style="font-weight:600">Source Serif 4</strong> i ordmärket, mono för teknisk yta. Fungerar bäst tryckt och i dokumentens sidfot.</div>
+      </div>
+    </div>
+
+    <!-- ============ 1b Sänkta e:t ============ -->
+    <div id="1b" style="width:660px;background:#FFFFFF;border:1px solid #D6D3CC;display:flex;flex-direction:column">
+      <div style="padding:22px 26px 20px;border-bottom:1px solid #E7E4DE;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#101113;color:#FFFFFF;padding:3px 7px">1b</span>
+          <span style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Sänkta e:t</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#5C574D;text-wrap:pretty">TeX sänker sitt E. Klartex sänker sitt — greppet sitter i ordet, symbolen abstraherar det till baslinje plus fallet tecken.</p>
+      </div>
+
+      <div style="position:relative;height:250px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:28px">
+        <sc-if value="{{ visaKonstruktion }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:143px;height:1px;background:rgba(14,124,134,0.4)"></div>
+          <div style="position:absolute;left:0;right:0;top:166px;height:1px;background:rgba(14,124,134,0.2)"></div>
+        </sc-if>
+        <div style="position:relative;width:64px;height:64px">
+          <div style="position:absolute;left:0;top:25px;width:64px;height:9px;background:#101113"></div>
+          <div style="position:absolute;right:0;top:41px;width:23px;height:23px;background:#0E7C86"></div>
+        </div>
+        <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:56px;letter-spacing:-0.035em;color:#101113;line-height:1">klart<span style="display:inline-block;transform:translateY(0.2em);color:#0E7C86">e</span>x</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #E7E4DE">
+        <div style="height:110px;background:#101113;display:flex;align-items:center;justify-content:center">
+          <div style="position:relative;width:54px;height:54px">
+            <div style="position:absolute;left:0;top:21px;width:54px;height:8px;background:#FFFFFF"></div>
+            <div style="position:absolute;right:0;top:35px;width:19px;height:19px;background:#3FB6BF"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;border-left:1px solid #E7E4DE;border-right:1px solid #E7E4DE;display:flex;align-items:center;justify-content:center;gap:12px">
+          <div style="position:relative;width:24px;height:24px">
+            <div style="position:absolute;left:0;top:9px;width:24px;height:4px;background:#101113"></div>
+            <div style="position:absolute;right:0;top:15px;width:9px;height:9px;background:#0E7C86"></div>
+          </div>
+          <div style="position:relative;width:16px;height:16px">
+            <div style="position:absolute;left:0;top:6px;width:16px;height:3px;background:#101113"></div>
+            <div style="position:absolute;right:0;top:10px;width:6px;height:6px;background:#0E7C86"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;display:flex;align-items:center;justify-content:center">
+          <div style="font-family:'Archivo',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.035em;color:#101113">klart<span style="display:inline-block;transform:translateY(0.2em)">e</span>x</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 26px 22px;border-top:1px solid #E7E4DE;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;height:34px;background:#FFFFFF;border:1px solid #E0DCD3"></div>
+          <div style="flex:1;height:34px;background:#101113"></div>
+          <div style="flex:1;height:34px;background:#0E7C86"></div>
+          <div style="flex:1;height:34px;background:#6E7479"></div>
+        </div>
+        <div style="display:flex;gap:24px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8377;letter-spacing:0.02em">
+          <span>#FFFFFF</span><span>#101113 grafit</span><span>#0E7C86 verdigris</span><span>#6E7479 grå</span>
+        </div>
+        <div style="font-size:13px;line-height:1.5;color:#5C574D">Typografi: <strong style="font-weight:600">Archivo</strong> tight tracking. Mest samtida av de fyra; skalar ner bäst till favicon.</div>
+      </div>
+    </div>
+
+    <!-- ============ 1c Hakparentesen ============ -->
+    <div id="1c" style="width:660px;background:#FFFFFF;border:1px solid #D6D3CC;display:flex;flex-direction:column">
+      <div style="padding:22px 26px 20px;border-bottom:1px solid #E7E4DE;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#F0A93B;color:#0B0C0E;padding:3px 7px">1c</span>
+          <span style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Hakparentesen</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#5C574D;text-wrap:pretty">JSON in, färdig sida ut. Två hakparenteser som håller ett massivt textblock. Talar direkt till agenter, CLI och API — mindre till marknadschefen som ska godkänna mallen.</p>
+      </div>
+
+      <div style="position:relative;height:250px;background:#0B0C0E;display:flex;align-items:center;justify-content:center;gap:26px">
+        <sc-if value="{{ visaKonstruktion }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:143px;height:1px;background:rgba(240,169,59,0.35)"></div>
+          <div style="position:absolute;left:0;right:0;top:99px;height:1px;background:rgba(240,169,59,0.2)"></div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:13px;height:52px;border-left:4px solid #E6E8EA;border-top:4px solid #E6E8EA;border-bottom:4px solid #E6E8EA;box-sizing:border-box"></div>
+          <div style="width:18px;height:30px;background:#F0A93B"></div>
+          <div style="width:13px;height:52px;border-right:4px solid #E6E8EA;border-top:4px solid #E6E8EA;border-bottom:4px solid #E6E8EA;box-sizing:border-box"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:46px;letter-spacing:-0.045em;color:#E6E8EA;line-height:1">klartex</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #E7E4DE">
+        <div style="height:110px;background:#FFFFFF;display:flex;align-items:center;justify-content:center">
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="width:11px;height:44px;border-left:3.5px solid #0B0C0E;border-top:3.5px solid #0B0C0E;border-bottom:3.5px solid #0B0C0E;box-sizing:border-box"></div>
+            <div style="width:15px;height:25px;background:#0B0C0E"></div>
+            <div style="width:11px;height:44px;border-right:3.5px solid #0B0C0E;border-top:3.5px solid #0B0C0E;border-bottom:3.5px solid #0B0C0E;box-sizing:border-box"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#0B0C0E;border-left:1px solid #E7E4DE;border-right:1px solid #E7E4DE;display:flex;align-items:center;justify-content:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:2px">
+            <div style="width:5px;height:20px;border-left:2px solid #E6E8EA;border-top:2px solid #E6E8EA;border-bottom:2px solid #E6E8EA;box-sizing:border-box"></div>
+            <div style="width:7px;height:12px;background:#F0A93B"></div>
+            <div style="width:5px;height:20px;border-right:2px solid #E6E8EA;border-top:2px solid #E6E8EA;border-bottom:2px solid #E6E8EA;box-sizing:border-box"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:1.5px">
+            <div style="width:4px;height:14px;border-left:1.5px solid #E6E8EA;border-top:1.5px solid #E6E8EA;border-bottom:1.5px solid #E6E8EA;box-sizing:border-box"></div>
+            <div style="width:5px;height:8px;background:#F0A93B"></div>
+            <div style="width:4px;height:14px;border-right:1.5px solid #E6E8EA;border-top:1.5px solid #E6E8EA;border-bottom:1.5px solid #E6E8EA;box-sizing:border-box"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#0B0C0E;display:flex;align-items:center;justify-content:center;padding:0 14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B7075;line-height:1.7"><span style="color:#F0A93B">$</span> klartex -d data.json<br><span style="color:#E6E8EA">→ offert.pdf</span></div>
+        </div>
+      </div>
+
+      <div style="padding:18px 26px 22px;border-top:1px solid #E7E4DE;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;height:34px;background:#0B0C0E"></div>
+          <div style="flex:1;height:34px;background:#E6E8EA;border:1px solid #E0DCD3"></div>
+          <div style="flex:1;height:34px;background:#F0A93B"></div>
+          <div style="flex:1;height:34px;background:#6B7075"></div>
+        </div>
+        <div style="display:flex;gap:24px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8377;letter-spacing:0.02em">
+          <span>#0B0C0E</span><span>#E6E8EA</span><span>#F0A93B bärnsten</span><span>#6B7075</span>
+        </div>
+        <div style="font-size:13px;line-height:1.5;color:#5C574D">Typografi: <strong style="font-weight:600">JetBrains Mono</strong>. Starkast på PyPI och i dokumentation — svagast dagen webbappen ska sälja in sig till en icke-teknisk beställare.</div>
+      </div>
+    </div>
+
+    <!-- ============ 1d Stämpeln ============ -->
+    <div id="1d" style="width:660px;background:#FFFFFF;border:1px solid #D6D3CC;display:flex;flex-direction:column">
+      <div style="padding:22px 26px 20px;border-bottom:1px solid #E7E4DE;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;background:#2B3A67;color:#EFE8DC;padding:3px 7px">1d</span>
+          <span style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Stämpeln</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#5C574D;text-wrap:pretty">Svensk kansliton: ett stämpelfält med rubrikrad och signaturrader. Handlingen är beslutad, undertecknad, giltig.</p>
+      </div>
+
+      <div style="position:relative;height:250px;background:#EFE8DC;display:flex;align-items:center;justify-content:center;gap:24px">
+        <sc-if value="{{ visaKonstruktion }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:143px;height:1px;background:rgba(43,58,103,0.35)"></div>
+          <div style="position:absolute;left:0;right:0;top:106px;height:1px;background:rgba(43,58,103,0.2)"></div>
+        </sc-if>
+        <div style="position:relative;width:60px;height:60px;background:#2B3A67">
+          <div style="position:absolute;left:11px;top:15px;width:28px;height:6px;background:#EFE8DC"></div>
+          <div style="position:absolute;left:11px;top:31px;width:38px;height:3px;background:#EFE8DC"></div>
+          <div style="position:absolute;left:11px;top:41px;width:22px;height:3px;background:rgba(239,232,220,0.55)"></div>
+        </div>
+        <div style="font-family:'EB Garamond',serif;font-weight:500;font-size:60px;letter-spacing:0.01em;color:#2A2620;line-height:1">klartex</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #E7E4DE">
+        <div style="height:110px;background:#2A2620;display:flex;align-items:center;justify-content:center">
+          <div style="position:relative;width:52px;height:52px;background:#EFE8DC">
+            <div style="position:absolute;left:9px;top:13px;width:24px;height:5px;background:#2A2620"></div>
+            <div style="position:absolute;left:9px;top:27px;width:33px;height:3px;background:#2A2620"></div>
+            <div style="position:absolute;left:9px;top:36px;width:19px;height:3px;background:rgba(42,38,32,0.5)"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;border-left:1px solid #E7E4DE;border-right:1px solid #E7E4DE;display:flex;align-items:center;justify-content:center;gap:12px">
+          <div style="position:relative;width:24px;height:24px;background:#2B3A67">
+            <div style="position:absolute;left:4px;top:6px;width:11px;height:3px;background:#EFE8DC"></div>
+            <div style="position:absolute;left:4px;top:13px;width:16px;height:2px;background:#EFE8DC"></div>
+          </div>
+          <div style="position:relative;width:16px;height:16px;background:#2B3A67">
+            <div style="position:absolute;left:3px;top:4px;width:7px;height:2px;background:#EFE8DC"></div>
+            <div style="position:absolute;left:3px;top:9px;width:10px;height:2px;background:#EFE8DC"></div>
+          </div>
+        </div>
+        <div style="height:110px;background:#FFFFFF;display:flex;align-items:center;justify-content:center">
+          <div style="font-family:'EB Garamond',serif;font-weight:500;font-size:26px;letter-spacing:0.01em;color:#2A2620">klartex</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 26px 22px;border-top:1px solid #E7E4DE;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;height:34px;background:#EFE8DC;border:1px solid #E0DCD3"></div>
+          <div style="flex:1;height:34px;background:#2A2620"></div>
+          <div style="flex:1;height:34px;background:#2B3A67"></div>
+          <div style="flex:1;height:34px;background:#9A9184"></div>
+        </div>
+        <div style="display:flex;gap:24px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8377;letter-spacing:0.02em">
+          <span>#EFE8DC sepia</span><span>#2A2620 bläck</span><span>#2B3A67 stämpelblå</span><span>#9A9184</span>
+        </div>
+        <div style="font-size:13px;line-height:1.5;color:#5C574D">Typografi: <strong style="font-weight:600">EB Garamond</strong>. Mest trovärdig mot traditionella företagskunder — men riskerar att läsas som avsändare i stället för verktyg.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <sc-if value="{{ visaTillampningar }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top:64px;display:flex;flex-direction:column;gap:20px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8377">Samma märke, tre lägen</div>
+      <div style="display:flex;flex-wrap:wrap;gap:24px">
+        <div style="width:300px;background:#FFFFFF;border:1px solid #D6D3CC;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:13px;font-weight:600">Sidfot i kundens dokument</div>
+          <div style="border-top:1px solid #D6D3CC;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-family:'Source Serif 4',serif;font-size:11px;color:#8A8377">
+            <span>Nordvik Teknik AB · Offert 2026-041</span>
+            <span style="display:flex;align-items:center;gap:5px">satt med <span style="font-weight:600;color:#5C574D">klartex</span></span>
+          </div>
+          <div style="font-size:12px;line-height:1.5;color:#8A8377;text-wrap:pretty">Diskret rad, aldrig logotyp i full storlek. Dokumentet bär kundens identitet.</div>
+        </div>
+        <div style="width:300px;background:#FFFFFF;border:1px solid #D6D3CC;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:13px;font-weight:600">Favicon 16 px</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <img src="klartex-symbol.svg" alt="" style="height:16px;display:block">
+            <img src="klartex-symbol.svg" alt="" style="height:32px;display:block">
+            <span style="background:#071A43;padding:6px;display:flex;gap:12px;align-items:center"><img src="klartex-symbol-reverse.svg" alt="" style="height:16px;display:block"><img src="klartex-symbol-reverse.svg" alt="" style="height:32px;display:block"></span>
+          </div>
+          <div style="font-size:12px;line-height:1.5;color:#8A8377;text-wrap:pretty">Omgång 1 är historik — symbolen är nu låst till din k-form. Den håller i 16 px, men kräver den negativa versionen på mörkt.</div>
+        </div>
+        <div style="width:300px;background:#FFFFFF;border:1px solid #D6D3CC;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:13px;font-weight:600">Släktskap med systersystemen</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-family:'Archivo',sans-serif;font-size:13px;font-weight:600;color:#5C574D">
+            <span style="border:1px solid #D6D3CC;padding:4px 9px">styrla</span>
+            <span style="border:1px solid #D6D3CC;padding:4px 9px">timla</span>
+            <span style="border:1px solid #D6D3CC;padding:4px 9px">openvera</span>
+            <span style="border:1px solid #D6D3CC;padding:4px 9px">tutti</span>
+          </div>
+          <div style="font-size:12px;line-height:1.5;color:#8A8377;text-wrap:pretty">Löst släktskap: gemener och samma symbolvikt delas, färg och typsnitt är fritt per tjänst.</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;visaKonstruktion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Visning&quot;},&quot;visaTillampningar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Visning&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      visaKonstruktion: this.props.visaKonstruktion ?? false,
+      visaTillampningar: this.props.visaTillampningar ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>
