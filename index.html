@@ -5,46 +5,174 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Klartex — PDF från strukturerad data</title>
   <meta name="description" content="Skicka JSON, få en färdig PDF. Öppet API på app.klartex.se/api, plus ett Python-paket och CLI för den som vill köra renderingen själv.">
+  <meta name="theme-color" content="#071A43">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
   <style>
+    :root {
+      --papper: #FBFAF8;
+      --marin-900: #071A43;
+      --klarbla-600: #0A5FD8;
+      --linje: #E3E1DB;
+      --gra-600: #6B6A63;
+      --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+      --sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #1a1a1a;
+      background: var(--papper);
+      color: var(--marin-900);
+      font-family: var(--sans);
+      font-size: 16px;
       line-height: 1.6;
-      max-width: 720px;
+    }
+
+    .container {
+      max-width: 680px;
       margin: 0 auto;
-      padding: 3rem 1.5rem;
+      padding: 0 1.5rem;
     }
-    h1 { font-size: 2rem; margin-bottom: 0.25rem; }
-    .tagline { color: #555; font-size: 1.1rem; margin-bottom: 2rem; }
-    h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.5rem; }
-    p, li { margin-bottom: 0.5rem; }
+
+    a { color: var(--klarbla-600); }
+    a:focus-visible {
+      outline: 2px solid var(--klarbla-600);
+      outline-offset: 2px;
+    }
+
+    strong { font-weight: 600; }
+
+    /* Sidhuvud */
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: var(--marin-900);
+      color: #FFFFFF;
+      padding: 3rem 0 3.5rem;
+    }
+    .hero .container { position: relative; z-index: 1; }
+    .hero a:focus-visible { outline-color: #FFFFFF; }
+
+    .lockup {
+      display: inline-block;
+      text-decoration: none;
+      padding: 14px 22px 16px 34px;
+    }
+    .lockup img {
+      display: block;
+      width: clamp(140px, 14vw, 200px);
+      height: auto;
+    }
+
+    h1 {
+      margin-top: 1.5rem;
+      max-width: 20ch;
+      font-family: var(--serif);
+      font-optical-sizing: none;
+      font-variation-settings: 'opsz' 60;
+      font-weight: 600;
+      font-size: clamp(32px, 6vw, 56px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+    }
+
+    .blad {
+      position: absolute;
+      z-index: 0;
+      display: block;
+      pointer-events: none;
+    }
+    .blad-arm { left: -100px; top: 10px; width: min(680px, 60vw); }
+    .blad-omvant { right: -130px; bottom: -110px; width: min(680px, 60vw); }
+
+    @media (max-width: 640px) {
+      .blad { display: none; }
+    }
+
+    /* Innehåll */
+
+    main.container {
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    h2 {
+      margin: 2.5rem 0 0.75rem;
+      font-family: var(--serif);
+      font-optical-sizing: none;
+      font-variation-settings: 'opsz' 60;
+      font-weight: 600;
+      font-size: 21px;
+      line-height: 1.3;
+    }
+
+    p, li { margin-bottom: 0.75rem; }
     ul { padding-left: 1.5rem; }
+
+    code {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+    }
     pre {
-      background: #f5f5f5;
-      border-radius: 6px;
+      margin: 1rem 0;
       padding: 1rem;
+      border: 1px solid var(--linje);
       overflow-x: auto;
-      margin: 0.75rem 0;
-      font-size: 0.9rem;
     }
-    code { font-family: "SF Mono", Menlo, Consolas, monospace; }
-    a { color: #1a6dd4; }
-    .templates-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
-    .templates-table td, .templates-table th {
+
+    .table-scroll {
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+    .templates-table {
+      width: 100%;
+      min-width: 30rem;
+      border-collapse: collapse;
+      border-top: 1px solid var(--marin-900);
+    }
+    .templates-table th,
+    .templates-table td {
       text-align: left;
-      padding: 0.4rem 0.75rem;
-      border-bottom: 1px solid #eee;
+      padding: 0.5rem 1rem 0.5rem 0;
     }
-    .templates-table th { font-weight: 600; border-bottom: 2px solid #ddd; }
-    .templates-table code { background: #f5f5f5; padding: 0.15rem 0.35rem; border-radius: 3px; }
-    footer { margin-top: 3rem; color: #888; font-size: 0.85rem; }
+    .templates-table th {
+      font-weight: 600;
+      border-bottom: 1px solid var(--marin-900);
+    }
+    .templates-table td { border-bottom: 1px solid var(--linje); }
+    .templates-table tr > :last-child { padding-right: 0; }
+
+    /* Sidfot */
+
+    footer.container {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      padding-bottom: 3rem;
+      border-top: 1px solid var(--linje);
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--gra-600);
+    }
   </style>
 </head>
 <body>
 
-  <h1>Klartex</h1>
-  <p class="tagline">Skicka strukturerad data, få ett färdigt dokument. Kallelser, protokoll, fakturor och årsredovisningar som PDF.</p>
+  <header class="hero">
+    <img src="assets/klartex-blad-arm.svg" alt="" aria-hidden="true" class="blad blad-arm">
+    <img src="assets/klartex-blad-omvant.svg" alt="" aria-hidden="true" class="blad blad-omvant">
+    <div class="container">
+      <a href="/" class="lockup"><img src="assets/klartex-lockup-reverse.svg" alt="klartex" width="4168" height="1043"></a>
+      <h1>Skicka strukturerad data, få ett färdigt dokument. Kallelser, protokoll, fakturor och årsredovisningar som PDF.</h1>
+    </div>
+  </header>
+
+  <main class="container">
 
   <p>Renderingen finns som ett öppet HTTP-API. Det här anropet fungerar som det står, utan installation och utan konto:</p>
 
@@ -74,8 +202,12 @@
 
   <h2>Mallar</h2>
 
+  <div class="table-scroll">
   <table class="templates-table">
-  <tr><th>Mall</th><th>Beskrivning</th></tr>
+  <thead>
+  <tr><th scope="col">Mall</th><th scope="col">Beskrivning</th></tr>
+  </thead>
+  <tbody>
   <tr><td><code>_block</code></td><td>Blockmotorn — bygg dokumentet fritt av typade block när ingen mall passar</td></tr>
   <tr><td><code>balansrakning</code></td><td>Balansräkning med tillgångar och eget kapital och skulder</td></tr>
   <tr><td><code>budgetrapport</code></td><td>Budgetrapport med kontokoder, budgeterat och utfall</td></tr>
@@ -84,7 +216,9 @@
   <tr><td><code>protokoll</code></td><td>Mötesprotokoll med dagordning, beslut och justerare</td></tr>
   <tr><td><code>resultatrakning</code></td><td>Resultaträkning med jämförelseår och valfri notapparat</td></tr>
   <tr><td><code>sie-exportrapport</code></td><td>Läsbar PDF av SIE4-bokföringsdata</td></tr>
+  </tbody>
   </table>
+  </div>
 
   <h2>Ta reda på vad som ska skickas</h2>
 
@@ -103,7 +237,9 @@ GET  /api/blocks/text/schema         # JSON Schema för en blocktyp</code></pre>
 
   <p>Att registrera en <strong>egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver ett konto. <strong>Konton är under utveckling och inte lanserade än</strong>, så <code>POST /api/page-templates</code> svarar <code>401</code> tills vidare. Det är väntat och inte ett fel. Fram till dess går egen formgivning att skicka med per anrop via <code>page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan.</p>
 
-  <footer>
+  </main>
+
+  <footer class="container">
     <a href="https://pypi.org/project/klartex/">PyPI</a> ·
     <a href="https://github.com/swedev/klartex">GitHub</a> ·
     <a href="/llms.txt">llms.txt</a><br>
