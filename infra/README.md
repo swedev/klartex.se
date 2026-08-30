@@ -14,7 +14,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 | `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION` och `RENDER_VERSION`; `API_TOKEN` är valfri. |
 | `../.github/workflows/deploy.yml` | Deployar vid en `v*`- eller `render-v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, restartar. |
 
-Stacken har tre containrar. `caddy` är publik entrypoint; `backend` (`../backend/`) lyssnar på loopback och bär `/api`; `render` (`../render/`) kompilerar LaTeX och är nåbar enbart från `backend` på ett internt compose-nätverk.
+Stacken har tre containrar. `caddy` är publik entrypoint; `backend` (`../backend/`) lyssnar på loopback och bär `/api` — policy, discovery och sidmallsregistret; `render` (`../render/`) kompilerar LaTeX åt `backend` och är nåbar enbart från den på ett internt compose-nätverk. `backend` startar först när `render` är `healthy`.
 
 ## Från noll till live
 
@@ -44,18 +44,18 @@ De två tjänsterna har egna versionsserier och släpps av var sin tagg. En prod
 | | `backend` | `render` |
 |---|---|---|
 | Katalog | `backend/` | `render/` |
-| Tagg | `v0.5.0` | `render-v0.1.0` |
+| Tagg | `v0.6.0` | `render-v0.1.0` |
 | Image | `ghcr.io/swedev/klartex-se-backend` | `ghcr.io/swedev/klartex-se-render` |
 | `.env` | `BACKEND_VERSION` | `RENDER_VERSION` |
 
 1. Bumpa `version` i tjänstens `pyproject.toml` och `__version__` i dess `__init__.py`. För `render`: bumpa även `RENDER_VERSION` i `.env.example`.
 2. Merga till `main`. Ingenting byggs — `ci.yml` kör bara testerna.
-3. Tagga samma version och pusha taggen: `git tag v0.5.1 && git push origin v0.5.1`, eller `git tag render-v0.1.1 && git push origin render-v0.1.1`. Taggen bygger imagen, smoke-testar den, publicerar den och deployar, i den ordningen.
-4. Verifiera: `curl -fsS https://app.klartex.se/api/health`. Deployen har redan kört ett riktigt render-anrop mot `render` innan den släppte återställningstrappen.
+3. Tagga samma version och pusha taggen: `git tag v0.6.1 && git push origin v0.6.1`, eller `git tag render-v0.1.1 && git push origin render-v0.1.1`. Taggen bygger imagen, smoke-testar den, publicerar den och deployar, i den ordningen.
+4. Verifiera: `curl -fsS https://app.klartex.se/api/health`. Deployen har redan kört ett riktigt render-anrop innan den släppte återställningstrappen — en `backend`-release via `/api/render`, så hela kedjan svarar för sig, en `render`-release inifrån render-containern.
 
 Taggen måste matcha tjänstens `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det health-endpointen rapporterar då skulle säga olika saker. Deployen skriver bara sin egen versionsrad i `.env`; den andra tjänsten fortsätter på den version den kör.
 
-`klartex`-pinnen måste vara identisk i `backend/pyproject.toml` och `render/pyproject.toml`, och CI kontrollerar det. En kärnbump rullas därför ut i två taggar samma dag, i ordningen **`render` först, `backend` sedan**: renderaren validerar varje anrop mot sin egen kärna, så en klient som byggt sitt dokument mot en äldre discovery får det ändå renderat, medan det omvända — discovery som erbjuder block renderaren inte känner — är det ordningen undviker. Deployen skriver ut båda tjänsternas health-svar, så versionerna går att läsa av i körningsloggen.
+`klartex`-pinnen måste vara identisk i `backend/pyproject.toml` och `render/pyproject.toml`, och CI kontrollerar det. En kärnbump rullas därför ut i två taggar samma dag, i ordningen **`render` först, `backend` sedan**: renderaren validerar varje anrop mot sin egen kärna, så en klient som byggt sitt dokument mot en äldre discovery får det ändå renderat, medan det omvända — discovery som erbjuder block renderaren inte känner — är det ordningen undviker. Deployen skriver ut båda tjänsternas health-svar, och en `backend`-deploy stannar dessutom om de rapporterar olika `klartex`-version. Ett fönster där `render` ligger en version före är alltså tillåtet; det omvända är det inte.
 
 Kör compose-filen mot en `.env` som saknar `RENDER_VERSION` stannar `docker compose pull` på den saknade variabeln, före omstarten, med den körande stacken orörd.
 
@@ -81,7 +81,9 @@ Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka
 
 `POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
 
-Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`). Båda containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB), och varför taken är satta som de är medan bara den ena tjänsten kompilerar, står i kommentaren överst i den filen.
+`render` har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), och `backend` håller ett lika stort tak på anrop i luften dit. Båda containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB) står i kommentaren överst i den filen. `render` bär huvuddelen av minnestaket eftersom det är den som kompilerar; `backend` behöver sina 768m för de bundle-payloads den bygger.
+
+Når `backend` inte `render` — nere, omstartande eller långsammare än tidsbudgeten — svarar `/api/render` `502 render_unavailable`. Tidsbudgeten summerar under proxyns tak: `xelatex` två gånger à 60 s, klienten mot `render` som mest 165 s, Caddys `response_header_timeout` 180 s.
 
 ## Tillgång till GHCR-imagerna
 
@@ -101,8 +103,8 @@ Om en image behöver vara private framöver: skapa en GHCR-PAT med `read:package
 - `unattended-upgrades` är på för säkerhetsuppdateringar.
 - `fail2ban` rebans SSH brute-force.
 - `backend` lyssnar på loopback — bara Caddy kan nå den.
-- `render` publicerar ingen port alls och ligger på ett compose-nätverk med `internal: true`: den är nåbar enbart från `backend`, och har själv ingen väg ut till internet. Den har varken `environment` eller volymer, så den kompilerar med både `API_TOKEN` och sidmallsregistret utom räckhåll.
-- `backend` kompilerar fortfarande i egen process, med `API_TOKEN` i miljön och `./page-templates` monterad. Den isoleringen `render` ger blir verklig för anroparstyrd LaTeX först när `backend` proxar dit i stället.
+- `render` publicerar ingen port alls och ligger på ett compose-nätverk med `internal: true`: den är nåbar enbart från `backend`, och har själv ingen väg ut till internet. Den har varken `environment` eller volymer, så all anroparstyrd LaTeX kompileras med både `API_TOKEN` och sidmallsregistret utom räckhåll — och det den eventuellt läser inne i containern kan inte lämna den annat än i den PDF `backend` returnerar.
+- `backend` bär hemligheten och volymen men kör ingen `xelatex`. Sidmallens filer läses där och följer med anropet till `render`, som skriver dem till en temporär katalog per anrop.
 
 ## Felsökning
 

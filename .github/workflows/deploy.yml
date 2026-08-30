@@ -113,12 +113,20 @@ jobs:
 
       # CI already ran these on the pull request. Running them again here
       # binds the tested tree to the published image.
-      - name: Run tests
+      - name: Install
         working-directory: ./${{ needs.resolve.outputs.service }}
         run: |
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
-          pytest -q
+
+      # The backend's contract test drives the render service in-process.
+      - name: Install the render service for the contract test
+        if: needs.resolve.outputs.service == 'backend'
+        run: pip install -e ./render
+
+      - name: Run tests
+        working-directory: ./${{ needs.resolve.outputs.service }}
+        run: pytest -q
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -139,31 +147,86 @@ jobs:
           load: true
           tags: smoke-test:amd64
 
+      # The render service is smoke-tested alone; the backend is smoke-tested
+      # against a real one, since it compiles nothing itself and would
+      # otherwise only prove that it can answer 502.
       - name: Smoke-test (render a minimal block-engine PDF)
         run: |
+          wait_for() {
+            for i in $(seq 1 30); do
+              if curl -fsS "$1" >/dev/null 2>&1; then
+                echo "✓ $1 up after ${i}s"; return 0
+              fi
+              sleep 1
+            done
+            echo "$1 never came up"
+            return 1
+          }
+
           if [ "$SERVICE" = render ]; then
-            health=/health
-            render=/render
+            docker run -d --name smoke -p 18000:8000 smoke-test:amd64
+            health=http://localhost:18000/health
+            render=http://localhost:18000/render
           else
-            health=/api/health
-            render=/api/render
+            # The version infra/.env.example pins is the one production runs,
+            # so this is the pairing the release is deployed as. The container
+            # is named `render` because that is the host the backend defaults
+            # to on the compose network.
+            render_version=$(sed -n 's/^RENDER_VERSION=//p' infra/.env.example)
+            echo "pairing the backend with klartex-se-render:$render_version"
+            docker network create smoke-net
+            docker run -d --name render --network smoke-net \
+              "ghcr.io/swedev/klartex-se-render:$render_version"
+            docker run -d --name smoke --network smoke-net -p 18000:8000 \
+              smoke-test:amd64
+            health=http://localhost:18000/api/health
+            render=http://localhost:18000/api/render
           fi
 
-          docker run -d --name smoke -p 18000:8000 smoke-test:amd64
-          for i in $(seq 1 30); do
-            if curl -fsS "http://localhost:18000$health" >/dev/null 2>&1; then
-              echo "✓ $health up after ${i}s"; break
+          dump_logs() {
+            echo "--- $SERVICE logs ---"; docker logs smoke
+            if [ "$SERVICE" != render ]; then
+              echo "--- render logs ---"; docker logs render
             fi
-            sleep 1
-          done
-          curl -fsS "http://localhost:18000$health"
+          }
+
+          wait_for "$health" || { dump_logs; exit 1; }
+          curl -fsS "$health"
+
+          if [ "$SERVICE" != render ]; then
+            # Discovery answers from the backend's own core, and it has to be
+            # the core that renders. The pins job in ci.yml keeps them equal;
+            # this is the running proof.
+            curl -fsS http://localhost:18000/api/templates | grep -q '"_block"' || {
+              echo "/api/templates does not list _block"; dump_logs; exit 1;
+            }
+            backend_core=$(curl -fsS "$health" | jq -r .klartex)
+            render_core=$(docker exec render curl -fsS http://localhost:8000/health | jq -r .klartex)
+            if [ "$backend_core" != "$render_core" ]; then
+              echo "klartex differs: backend $backend_core, render $render_core"
+              exit 1
+            fi
+            echo "✓ both services on klartex $backend_core"
+
+            # The anonymous tier may not send raw LaTeX. A 403 here is the
+            # policy layer answering before anything reaches the compiler.
+            code=$(curl -s -o /tmp/latex.json -w '%{http_code}' \
+              -X POST "$render" -H "Content-Type: application/json" \
+              -d '{"template":"_block","data":{"body":[{"type":"latex","body":"\\hrule"}]}}')
+            if [ "$code" != "403" ]; then
+              echo "anonymous latex block answered HTTP $code, expected 403"
+              cat /tmp/latex.json; dump_logs; exit 1
+            fi
+            echo "✓ anonymous latex block refused with 403"
+          fi
+
           code=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
-            -X POST "http://localhost:18000$render" \
+            -X POST "$render" \
             -H "Content-Type: application/json" \
             -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
           echo "render HTTP $code"
           if [ "$code" != "200" ]; then
-            echo "--- $SERVICE logs ---"; docker logs smoke
+            dump_logs
             echo "--- response ---"; cat /tmp/out.pdf
             exit 1
           fi
@@ -360,22 +423,48 @@ jobs:
           echo "health check: OK ($SERVICE $reported)"
 
           # A live render, still under the restore trap: a healthy container
-          # that cannot compile is what this catches.
-          docker compose exec -T render curl -fsS -X POST http://localhost:8000/render \
-              -H 'Content-Type: application/json' \
-              -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"deploy check"}]}}' \
-              > /tmp/deploy-render-check.pdf
+          # that cannot compile is what this catches. A backend release is
+          # asked through the public path, so the whole chain — policy,
+          # proxy, compiler — answers for itself; a render release is asked
+          # from inside its own container, since the backend in front of it
+          # is not what changed.
+          if [[ "$SERVICE" == render ]]; then
+              docker compose exec -T render curl -fsS -X POST http://localhost:8000/render \
+                  -H 'Content-Type: application/json' \
+                  -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"deploy check"}]}}' \
+                  > /tmp/deploy-render-check.pdf
+          else
+              curl -fsS -X POST http://127.0.0.1:8000/api/render \
+                  -H 'Content-Type: application/json' \
+                  -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"deploy check"}]}}' \
+                  > /tmp/deploy-render-check.pdf
+          fi
           head -c 4 /tmp/deploy-render-check.pdf | grep -q '%PDF' || {
               echo "render did not return a PDF"; head -c 200 /tmp/deploy-render-check.pdf; false
           }
           echo "render check: OK ($(stat -c%s /tmp/deploy-render-check.pdf) bytes of PDF)"
           rm -f /tmp/deploy-render-check.pdf
 
-          # Both cores, printed side by side. They have to be the same
-          # version: discovery schemas come from one, the renderer from the
-          # other.
-          echo "backend health: $(health_of backend)"
-          echo "render  health: $(health_of render)"
+          # Both cores, side by side. They have to be the same version:
+          # discovery schemas come from one, the renderer from the other. A
+          # core bump is rolled out render first, so a backend release is
+          # where a mismatch has to stop — a render release may legitimately
+          # be a step ahead for the rest of the day.
+          backend_health="$(health_of backend)"
+          render_health="$(health_of render)"
+          echo "backend health: $backend_health"
+          echo "render  health: $render_health"
+
+          if [[ "$SERVICE" == backend ]]; then
+              core_field() { sed -n 's/.*"klartex":"\([^"]*\)".*/\1/p'; }
+              backend_core="$(printf '%s' "$backend_health" | core_field)"
+              render_core="$(printf '%s' "$render_health" | core_field)"
+              if [[ -z "$backend_core" || "$backend_core" != "$render_core" ]]; then
+                  echo "klartex differs — backend '${backend_core:-nothing}', render '${render_core:-nothing}'" >&2
+                  false
+              fi
+              echo "klartex check: OK (both on $backend_core)"
+          fi
 
           trap - ERR
           REMOTE

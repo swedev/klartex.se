@@ -69,11 +69,15 @@ app.klartex.se {
 
     handle @api {
         reverse_proxy backend:8000 {
-            # PDF responses can be a few MB; keep timeouts generous. A render
-            # is two xelatex runs of up to 60s each, so the proxy must wait
-            # longer than the worst legitimate case.
+            # PDF responses can be a few MB, and the render travels one hop
+            # further than the backend: a render is two xelatex runs of up
+            # to 60s each, and the backend's client to the render service
+            # spends at worst 5s connecting + 30s writing + 130s reading
+            # = 165s before it gives up. Waiting longer than that is what
+            # lets a structured error reach the client instead of a Caddy
+            # timeout.
             transport http {
-                response_header_timeout 150s
+                response_header_timeout 180s
             }
         }
     }
