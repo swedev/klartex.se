@@ -2,33 +2,31 @@
 
 **Påbörjad:** 2026-08-30
 **Senast uppdaterad:** 2026-08-30
-**Status:** Fas 1 klar (PR 1); Fas 2–4 återstår
+**Status:** PR 0 implementerad; PR 2a och 2b blockerade av swedev/klartex#81
 
 ## Genomförda steg
 
-- [x] Fas 1, steg 1: `render/` skapad som eget Python-projekt. `pyproject.toml` (`klartex-se-render` 0.1.0, `klartex==0.15.0` — samma pin som backend), `src/klartex_render/__init__.py`, `main.py` (FastAPI utan docs/openapi, `GET /health` med `status`/`version`/`klartex`, middleware som avvisar `Content-Length` över `MAX_REQUEST_BYTES` = 80 MB med 413 innan kroppen läses) och `render.py` (`RenderRequest` med `template`/`data`/`page_template_source`/`assets`, asset-validering mot samma `ASSET_NAME_RE` och samma gränser som registret, tempkatalog per anrop, `MAX_CONCURRENT_RENDERS = 2`, `_block_error_path` + `_BLOCK_ERROR_RE` och felmappningen flyttade hit ur `backend/src/klartex_se/render.py`).
-- [x] Fas 1, steg 2: `render/tests/test_render.py` — 33 tester, alla gröna lokalt med xelatex på PATH. De kärnnära testerna kopierade från `backend/tests/test_render.py` (block-error-path i alla tre meddelandeformer, nästlade carriers, forgery-fallet, schema-path, semaforen inklusive tredje samtidiga anrop) plus nya för det inline-kontraktet: bundle med `logo.png` renderar, samma bundle utan assetet ger 500, temporärkatalogen är borta när svaret skrivits, ett anrop utan bundle skickar `asset_dir=None`, ogiltiga filnamn (`../`, `sub/`, dotfile, tomt, för långt) → 400, ogiltig base64 → 400, för stor asset → 400, för många assets → 400, för stor `page_template_source` → 400, för stor `Content-Length` → 413, inget OpenAPI-schema publiceras. `backend/tests/` orörd — monoliten förblir testad tills den byts i Fas 2.
-- [x] Fas 1, steg 3: `render/Dockerfile` — samma `FROM ghcr.io/swedev/klartex-base`-pin (tagg + digest) som backend har idag, `COPY pyproject.toml` + `src/` följt av `pip install --no-cache-dir .` i venvet så pinnen finns på ett ställe, `HEALTHCHECK` mot `http://localhost:8000/health`, `uvicorn klartex_render.main:app`. Wheel-bygget verifierat lokalt (`pip install ./render` i ett tomt venv importerar `klartex_render`); själva image-bygget kräver 9 GB-basen och är inte kört här.
-- [x] Fas 1, steg 4: `render/README.md` — syfte, kontraktet (`/health`, `/render`, request-formen, gränserna, felsvarstabellen), belastningstaket, lokal körning på port 8001, Docker och basimage-bump, deploy via `render-v*` och utrullningsordningen vid kärnbump. Bär uttryckligen att tjänsten aldrig ska exponeras publikt.
-- [x] Fas 1, steg 5: compose, env och workflows.
-  - `infra/docker-compose.yml`: tjänsten `render` (`${RENDER_VERSION:?…}`, inga `ports`, inga volymer, ingen `environment`, healthcheck, `restart: unless-stopped`), nätverket `render` med `internal: true`, `backend` på både `default` och `render`. Övergångstak enligt designbeslut 6: `render` 1536m/1.5 CPU, `backend` sänkt 2560m → 1792m. `docker compose config` validerar; utan `RENDER_VERSION` stannar den på den saknade variabeln med det avsedda meddelandet.
-  - `infra/.env.example`: `RENDER_VERSION=0.1.0` med kommentar om den egna versionsserien.
-  - `.github/workflows/deploy.yml`: trigger även på `render-v*`; nytt `resolve`-jobb som ur taggen härleder `service`, `version`, `image` och `env_var` och verifierar versionen mot rätt `pyproject.toml`; `build` och `deploy` parametriserade på dess outputs; smoke-testet väljer `/health`+`/render` eller `/api/health`+`/api/render`; deploy-steget skriver bara sin egen `.env`-rad, kontrollerar `backend render caddy`, verifierar den släppta tjänstens version (för `render` via `docker compose exec -T render curl`), kör ett riktigt render-anrop mot `render` medan `restore`-trappen är armerad, och skriver ut båda tjänsternas health-svar.
-  - `.github/workflows/ci.yml`: matris `backend`/`render` plus jobbet `pins` som jämför `klartex==`-pinnarna. Båda run-blocken syntaxkontrollerade, pin-kontrollen körd lokalt (`klartex==0.15.0`).
-- [x] Fas 1, steg 6: `infra/README.md` — tabellraderna för `docker-compose.yml`, `.env.example` och `deploy.yml`, en mening om stackens tre containrar, omskrivet "Uppgradera"-avsnitt (två serier, tabell, kärnbump i ordningen render → backend, felordningen stannar vid `pull`), GHCR-avsnittet täcker båda paketen inklusive synlighetsfällan, säkerhetsavsnittet beskriver `render` utan portar, volymer, hemligheter och egress, felsökningen får `logs render` och health via `docker compose exec`.
+- [x] **Fas 0 (PR 0): deploybarheten återställd.** Stacken är tillbaka i `v0.5.0`:s form — `backend` och `caddy`, inga render-referenser.
+  - `render/` borttagen i sin helhet — render-tjänsten byggs av `swedev/klartex`, inte här.
+  - `infra/docker-compose.yml`: tjänsten `render` och det interna nätverket `render` borta; `backend` på ett enda nätverk med taken 2560m / 1.5 CPU. `docker compose config` validerar med bara `BACKEND_VERSION` satt och `API_TOKEN` osatt.
+  - `.github/workflows/deploy.yml`: `render-v*`-triggern och `resolve`-jobbet borta; ett `v*`-flöde med jobben `build` och `deploy`.
+  - `.github/workflows/ci.yml`: matrisen och `pins`-jobbet borta; ett `test`-jobb mot `backend/`.
+  - `infra/.env.example`: `RENDER_VERSION` borta.
+  - `infra/README.md`: alla render-referenser borta (tabellrader, "Uppgradera", GHCR-avsnittet, säkerhet, felsökning); felsökningens logg-kommando namnger tjänsten `backend`.
+  - Verifierat: `pytest -q -rs` i `backend/` (74 gröna), `docker compose config` med enbart `BACKEND_VERSION`, båda workflow-filerna parsar som YAML, och ingen fil utanför `agent-docs/` nämner `render-v`, `RENDER_VERSION`, `klartex-se-render` eller `render/`.
 
 ## Pågående arbete
 
-Inget. Fas 1 ligger komplett på `issue/46-split-backend-render-app` och är avsedd som **PR 1**: den lägger till `render` bredvid monoliten utan att ändra något utåt.
+Inget. PR 0 ligger komplett och stänger inget issue (`Refs #46`).
 
 ## Återstår
 
-- **Fas 2 (PR 2)** — `backend` blir policy-lagret: `render_client.py`, `render.py` utan kompilering, `load_bundle_payload` i `page_templates.py`, version 0.6.0, slim-Dockerfile, omskrivna och nya tester (`test_render_client.py`, `test_contract.py`), compose-ändringarna för `backend` (`RENDER_URL`, `depends_on`, slutgiltiga tak, python-healthcheck), tvåcontainer-smoke i `deploy.yml`, Caddyfile 150 s → 180 s.
-- **Fas 3 (i PR 2)** — `backend/README.md`, `infra/README.md`, `PLAN.md`, `CLAUDE.md` i nu-state.
-- **Fas 4** — utrullning: `render-v0.1.0` först, mätning av två samtidiga renders med `docker stats` innan PR 2 mergas (det avgör om 1792m i designbeslut 6 håller), sedan `v0.6.0`.
+- **Fas 1 (PR 2a)** — kom ikapp kärnan på den monolitiska imagen: pin-bump till kärnreleasen från swedev/klartex#81, `header_source` i stället för `page_template_source`, aliasen `formal`/`clean`/`none` bort ur det publika API:t (`BUILTIN_PAGE_TEMPLATES` raderas, `page_template` blir `str | object`), shimmen som skickar monolitiska bundlar som `header_source` med `footer: null`, och rensning av alias-namnen ur `llms.txt`, `index.html`, README och `RenderRequest`-exemplen. Kräver att kärnreleasen finns på PyPI.
+- **Fas 2 (PR 2b)** — proxy och konsumtion: `render_client.py`, `render.py` utan kompilering, `load_bundle_payload`, version 0.6.0, slim-Dockerfile, `test_render_client.py` och `test_contract.py`, `render`-tjänsten från `ghcr.io/swedev/klartex-render:${KLARTEX_VERSION}` med internt nät och härdning, `KLARTEX_VERSION` avledd ur backendens `klartex==`-pin och skriven till serverns `.env` av varje backend-deploy, tvåcontainer-smoke i `deploy.yml`, Caddy 180 s och docs i nu-state. Kräver att imagen finns publik på GHCR. Bär `Closes #46, closes #47`.
+- **Fas 3** — utrullning av `v0.6.0`, verifiering på servern och minnesmätning med `docker stats`; taken justeras i en följdcommit.
 
 ## Anteckningar
 
-- Designbeslut 8 (två PR:er i utrullningsordning) är skälet till att den här grenen stannar vid Fas 1: PR 2 får inte mergas förrän `render-v0.1.0` ligger i produktion och minnesmätningen i Fas 4 steg 2 är gjord.
-- Verifieringschecklistans punkter som kräver `docker build` av 9 GB-basen, en lokal compose-uppstart eller produktionsmiljön är inte körda här — de hör till Fas 4.
-- PR 1 stänger inget issue: `Refs #46`. `Closes #46, closes #47` hör till PR 2.
+- Runda 2 av det gamla tvåseriedesignet ligger som WIP-commit `20cb728` på `issue/46-split-backend-render-app-r2`. `render_client.py`, proxyn, `load_bundle_payload`, slim-Dockerfilen och kontraktstesterna där är avsedda att återanvändas i PR 2b, anpassade till kärnans slot-API och `klartex.server`.
+- Designbeslut 12 (tre PR:er) är skälet till att den här grenen stannar vid PR 0: 2a behöver kärnreleasen på PyPI och 2b dessutom imagen på GHCR.
+- Verifieringspunkter som kräver `docker build`, en lokal compose-uppstart eller produktionsmiljön hör till Fas 2 och 3 och är inte körda här.

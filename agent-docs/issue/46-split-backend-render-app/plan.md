@@ -2,12 +2,14 @@
 
 ## Mål
 
-Dela dagens enda backend-container i två tjänster i samma compose-stack:
+Dela dagens enda backend-container i två compose-tjänster:
 
-- **`render`** — en tillståndslös HTTP-inpackning av `klartex.render()`, byggd `FROM ghcr.io/swedev/klartex-base`, utan hemligheter i miljön, utan volymer, nåbar enbart på compose-nätverket. Byggs om när kärnan eller basen bumpas.
-- **`backend`** (issuets "app") — dagens FastAPI-app minus kompileringen: discovery, auth/tier-policy, page-template-registret och all publik `/api`-trafik. Kompilering proxas till `render`. Det är hit Postgres, konton och parla (#19), dokumentpersistens och den anonyma nivån (#23) sedan läggs.
+- **`render`** — processen som kör xelatex. Den är **kärnans artefakt**: `swedev/klartex` bygger och publicerar `ghcr.io/swedev/klartex-render:<kärnversion>` vid varje release, och klartex.se konsumerar imagen utan att någonsin bygga den. Kärnrepots halva är swedev/klartex#81 (`klartex serve` + release-jobbet som pushar imagen).
+- **`backend`** (issuets "app") — dagens FastAPI-app minus kompileringen: discovery, auth/tier-policy, page-template-registret och all publik `/api`-trafik, på `python:3.12-slim`. Kompilering proxas till `render`. Det är hit Postgres, konton och parla (#19), dokumentpersistens och den anonyma nivån (#23) läggs.
 
-Resultatet ska vara osynligt för API-klienter: samma endpoints, samma felformer, samma Caddy-konfig utåt. Skillnaden är att processen som kör anroparstyrd LaTeX inte längre delar miljö med någon hemlighet, att ett produktrelease flyttar megabyte i stället för gigabyte, och att #19 kan byggas i rätt behållare från början.
+Att render-motorn versioneras som kärnan följer av att de två alltid rör sig ihop: det finns ingen kärnrelease som lämnar renderaren orörd, och ingen ändring i renderaren som inte är en kärnrelease. klartex.se har därmed **en** kärn-pin och en egen appversion — inga två versionsserier att hålla i synk.
+
+Resultatet ska vara osynligt för API-klienter utom två avsiktliga ändringar: `502 render_unavailable` tillkommer, och sidmalls-aliasen `formal`/`clean`/`none` försvinner ur det publika kontraktet (användarbeslut, se Designbeslut 2). Skillnaden i drift är att processen som kör anroparstyrd LaTeX inte längre delar miljö med någon hemlighet, att ett produktrelease flyttar megabyte i stället för gigabyte, och att #19 kan byggas i rätt behållare från början.
 
 ## Triagering
 
@@ -15,267 +17,287 @@ Resultatet ska vara osynligt för API-klienter: samma endpoints, samma felformer
 
 | Fält | Värde |
 |------|-------|
-| **Blockeras av** | Inget |
+| **Blockeras av** | swedev/klartex#81 för PR 2a och 2b (kärnreleasen som bär alias-borttagningen, `klartex serve` och render-imagen). PR 0 blockeras av inget. |
 | **Blockerar** | #19 (konton/Postgres ska födas i `backend`, inte i TeX-containern), #47 (miljöexponeringen stängs av detta), #23 (payload-policyn i app-lagret) |
-| **Relaterade issues** | #47, #19, #23, #39, #20, #18, #14, swedev/klartex#51 |
-| **Omfattning** | ~22 filer i `backend/`, nytt `render/`, `infra/`, `.github/workflows/`, docs |
+| **Relaterade issues** | #47, #19, #23, #39, #20, #18, #64, #14, swedev/klartex#81, swedev/klartex#51 |
+| **Omfattning** | `backend/` (src, tests, Dockerfile, README), `infra/`, `.github/workflows/`, `llms.txt`, `index.html`, docs |
 | **Risk** | Medel |
 | **Komplexitet** | Medel |
-| **Säker för junior** | Nej — produktionsutrullning i två steg, deploy-workflow och compose-topologi |
+| **Säker för junior** | Nej — publikt API-kontrakt, produktionsutrullning, deploy-workflow och compose-topologi |
 | **Konfliktrisk** | Låg — inga öppna planer rör samma filer aktivt; den omergade #14-grenen ändrar enbart `app/` |
 
 ### Triagemässiga noteringar
 
-- **Inga blockerare.** swedev/klartex#51 (sandboxa xelatex i kärnan) är ett *alternativ* till den här splitten, inte en förutsättning; issuet är explicit med att splitten är det spår som finns nu. Båda kan landa — #51 skulle då härda `render` ytterligare.
-- **Ordningen mot #19 är poängen.** Issuet argumenterar att Postgres/parla ska byggas in i `backend` *efter* splitten. #19 bör därför inte påbörjas förrän den här planens Fas 2 är mergad.
-- **#47 stängs till hälften av #15 (0.5.0).** Det som återstår i #47 är miljöexponeringen i sig — exakt det `render` utan hemligheter löser. Planen bör stänga #47 (`Closes #46, closes #47` på PR 2) — verifiera vid PR-tillfället att inget nytt tillkommit i #47.
-- **#18 (assets per anrop)** får sitt interna kontrakt gratis: `render`-tjänstens API tar bundle inline. Den publika varianten på `/api/render` är fortfarande #18:s sak.
-- **#39 (releasebygget tar 8 min)** löses för produktreleaser: `backend`-imagen byggs på `python:3.12-slim` och flyttar aldrig TeX-basen. `render`-releaser behåller kostnaden, men de sker några gånger per år.
-- **Minnesbudgeten på cax11 (4 GB)** ska kontrolleras innan taken sätts (issuet flaggar det). Splitten i sig ökar inte totalen, men Postgres i #19 får inte plats i marginalen utan att antingen `render`s tak sänks efter mätning eller värden storleksändras (cax21, 8 GB). Det ska stå som explicit förutsättning i #19. Se designbeslut 6.
-- **GHCR-paketet `klartex-se-render` skapas av den första `render-v*`-körningen.** Repot är publikt och paket som publiceras av dess workflow ärver normalt synligheten, men det är inte garanterat. Servern pullar anonymt, så om paketet blir privat stannar `docker compose pull` — före omstarten, med stacken orörd. Åtgärden är då att sätta paketet publikt på `github.com/orgs/swedev/packages/container/klartex-se-render/settings` och köra om deployen via `workflow_dispatch` från taggen. Dokumenteras i `infra/README.md`.
-- **Frontend-bygget** (issuets "and the frontend build" under `app`) ligger utanför: källan finns bara på #14-grenen och Caddy servar `~/app` statiskt idag. Hur frontenden paketeras avgörs när #14 landar; ingenting i den här planen låser det.
+- **Kärnberoendet är hårt för 2a och 2b.** Båda kräver att kärnreleasen som bär alias-borttagningen och `klartex serve` ligger på PyPI; 2b kräver dessutom att `ghcr.io/swedev/klartex-render:<den versionen>` finns på GHCR. Det arbetet spåras i swedev/klartex#81 och görs inte här.
+- **Ordningen mot #19 är poängen.** Issuet argumenterar att Postgres/parla ska byggas in i `backend` *efter* splitten. #19 bör därför inte påbörjas förrän PR 2b är mergad.
+- **#47 stängs till hälften av #15 (0.5.0).** Det som återstår i #47 är miljöexponeringen i sig — exakt det `render` utan hemligheter löser. PR 2b bär `Closes #46, closes #47`; verifiera vid PR-tillfället att inget nytt tillkommit i #47.
+- **#18 (assets per anrop)** får sitt interna kontrakt gratis: kärnans `/render` tar bundle-innehållet inline. Den publika varianten på `/api/render` är fortfarande #18:s sak.
+- **#39 (releasebygget flyttar 9 GB)** löses helt för klartex.se: repot bygger ingen TeX-image alls efter splitten. Kostnaden ligger i kärnans release-flöde, några gånger per år.
+- **#64 (per-slot-bundlar)** är följdarbetet efter 2a. Registret bär en monolitisk `page_template.tex.jinja`, och shimmen i 2a översätter den till kärnans slot-API. Att bundle-formatet självt får `header`/`footer` hör hemma i #64.
+- **GHCR-paketets synlighet** är kärnrepots fälla, inte klartex.se:s: `klartex-render` skapas av kärnans första publicerande release och måste sättas publikt för hand (samma sak som klartex.se#48 dokumenterade för basen). Är paketet privat stannar `docker compose pull` — före omstarten, med stacken orörd.
+- **Minnesbudgeten på cax11 (4 GB)** ska mätas efter `v0.6.0` innan taken låses. Splitten i sig ökar inte totalen, men Postgres i #19 får inte plats i marginalen utan att antingen `render`s tak sänks efter mätning eller värden storleksändras (cax21, 8 GB). Det avgörs i #19. Se Designbeslut 9.
+- **Frontend-bygget** (issuets "and the frontend build" under `app`) ligger utanför: källan finns bara på #14-grenen och Caddy servar `~/app` statiskt idag.
 
 ## Angreppssätt
 
 ### Vad som flyttar vart
 
-Dagens `backend/src/klartex_se/render.py` innehåller två sorters kod som ska isär:
+`backend/src/klartex_se/render.py` innehåller två sorters kod som ska isär:
 
 | Kod | Är | Hamnar i |
 |-----|----|----------|
 | `find_latex_block`, `_child_block_lists`, tier-kontrollen (403) | Policy — vad anroparen får göra | `backend` |
-| `BUILTIN_PAGE_TEMPLATES`, bundle-uppslag mot registret (`get_bundle_path`) | Policy/lagring | `backend` |
-| `_block_error_path`, `_BLOCK_ERROR_RE`, mappning `ValidationError`/`ValueError`/`RuntimeError` → 400/500 | Kärnnära — beror på kärnans meddelandeformer | `render` |
-| `_render_slots`-semaforen (max 2 samtidiga, 503 `overloaded`) | Skydd av processen som kör xelatex | `render` |
-| `klartex_render(...)`-anropet | Kompilering | `render` |
+| Bundle-uppslag mot registret (`get_bundle_path`, `load_bundle_payload`) | Policy/lagring | `backend` |
+| `_block_error_path`, `_BLOCK_ERROR_RE`, mappning `ValidationError`/`ValueError`/`RuntimeError` → 400/500 | Kärnnära — beror på kärnans meddelandeformer | Kärnan (`klartex.server`) |
+| Semaforen kring xelatex (max 2 samtidiga, 503 `overloaded`) | Skydd av processen som kör xelatex | Kärnan (`klartex.server`) |
+| `klartex.render(...)`-anropet | Kompilering | Kärnan (`klartex.server`) |
 
-Discovery (`/api/templates`, `/api/blocks`, scheman) stannar i `backend`: det är rena Python-anrop mot `klartex`-paketet utan TeX, och `find_latex_block`s test pinnar sig mot kärnans `_child_block_lists`. `backend` behåller därför `klartex` som pip-beroende — men utan TeX-basen väger imagen några tiotal MB.
+Discovery (`/api/templates`, `/api/blocks`, scheman) stannar i `backend`: rena Python-anrop mot `klartex`-paketet utan TeX, och `find_latex_block`s test pinnar sig mot kärnans `_child_block_lists`. `backend` behåller därför `klartex` som pip-beroende — utan TeX-basen väger imagen några tiotal MB.
 
 ### Det interna kontraktet `backend → render`
 
-`render` exponerar två endpoints, utan `/api`-prefix (den är intern):
+Kontraktet ägs av kärnan (swedev/klartex#81) och är internt: ingen publik yta, ingen auth, ingen docs-sida.
 
-- `GET /health` → `{"status": "ok", "version": "<render-version>"}`
-- `POST /render` → `application/pdf` eller `{"detail": {...}}`
+- `GET /health` → `{"status": "ok", "version": "<kärnversion>"}`
+- `POST /render` body `{"template": str, "data": object, "header_source": str?, "footer_source": str?, "assets": {name: base64}?}` → `200 application/pdf`
+- Fel: `400 {"detail": {"type": "input_error"|"validation_error", "message", "path"?}}`, `413 payload_too_large`, `500 render_error`, `503 overloaded` med `Retry-After`
 
-Request-kroppen speglar `klartex.render()`s signatur, med `asset_dir` ersatt av inline-filer:
-
-```json
-{
-  "template": "_block",
-  "data": {"lang": "sv", "body": [...]},
-  "page_template_source": "<innehållet i page_template.tex.jinja eller null>",
-  "assets": {"logo.pdf": "<base64>", "font.ttf": "<base64>"}
-}
-```
-
-`render` skriver `assets` till en temporär katalog per anrop, anropar `klartex.render(template, data, page_template_source=..., asset_dir=tmp)` och städar. Inga volymer, inget tillstånd, ingen kännedom om registret. Filnamnen i `assets` valideras mot samma `ASSET_NAME_RE` som registret använder — `render` ska inte kunna fås att skriva utanför tempkatalogen ens av en felaktig `backend`.
-
-Felsvaren från `render` har exakt samma `detail`-form som `/api/render` har idag (`validation_error` + `path`, `input_error` [+ `path`], `render_error`, `overloaded` + `Retry-After`). `backend` skickar dem vidare oförändrade med samma statuskod. Det enda nya i det publika kontraktet är `502 render_unavailable` — när `backend` inte når `render` eller anropet tar för lång tid.
+`render` skriver `assets` till en temporär katalog per anrop, kompilerar och städar. Inga volymer, inget tillstånd, ingen kännedom om registret. `backend` skickar bundle-innehållet inline och passar felen vidare oförändrade — det enda nya i det publika kontraktet är `502 render_unavailable` när `backend` inte når `render` eller anropet tar för lång tid.
 
 ### Sekvens i `backend`s `/api/render` efter splitten
 
 1. Tier-kontroll: anonymt anrop med `latex`-block → 403 (oförändrat).
-2. `page_template`: inbyggd → merga in i `data`; okänt namn (varken inbyggd eller registrerad) → 400 `unknown_page_template` (oförändrat). Bundlens *innehåll* läses först i steg 4, innanför semaforen.
-3. Ta en av `MAX_INFLIGHT_RENDERS = 2` platser (icke-blockerande semafor, annars 503 `overloaded` + `Retry-After: 5`, samma form som `render`s). Samma tal som `render`s semafor: fler in-flight-anrop än så kan ändå bara vänta på ett 503 från `render`, och två är den övre gränsen för hur många bundle-payloads (~68 MB base64 i värsta fall, plus JSON-kopior) som byggs samtidigt i `backend`.
-4. Bundle-namn → läs `page_template.tex.jinja` och alla assets ur registret, base64:a dem.
-5. `POST {RENDER_URL}/render` med `httpx.Client(timeout=httpx.Timeout(connect=5, read=130, write=30, pool=5))`. Tidsbudgeten är uttalad och summerar även i värsta fall under proxyns tak: kärnans xelatex-tak är 2 × 60 s; `httpx` kan i värsta fall ta 5 + 30 + 130 = 165 s; Caddys `response_header_timeout` höjs från 150 s till **180 s** så att `backend` alltid hinner svara med ett strukturerat fel innan Caddy ger upp.
+2. `page_template`: objekt → skickas rakt igenom till kärnans slot-form; sträng → registrerat bundle-namn; okänt namn → 400 `unknown_page_template`. Bundlens *innehåll* läses först i steg 4, innanför semaforen.
+3. Ta en av `MAX_INFLIGHT_RENDERS = 2` platser (icke-blockerande semafor, annars 503 `overloaded` + `Retry-After: 5`, samma form som `render`s). Samma tal som kärnans semafor: fler in-flight-anrop kan ändå bara vänta på ett 503, och två är den övre gränsen för hur många bundle-payloads (~68 MB base64 i värsta fall, plus JSON-kopior) som byggs samtidigt.
+4. Bundle-namn → läs `page_template.tex.jinja` och alla assets ur registret, base64:a dem, och skicka källan som `header_source` med `data.page_template.footer = null` (Designbeslut 11).
+5. `POST {RENDER_URL}/render` med `httpx.Client(timeout=httpx.Timeout(connect=5, read=130, write=30, pool=5))`. Tidsbudgeten summerar även i värsta fall under proxyns tak: kärnans xelatex-tak är 2 × 60 s; `httpx` kan i värsta fall ta 5 + 30 + 130 = 165 s; Caddys `response_header_timeout` sätts till **180 s** så att `backend` alltid hinner svara med ett strukturerat fel innan Caddy ger upp.
 6. Svarshantering, i denna ordning:
    - 200 → PDF med `Content-Disposition` (oförändrat).
    - Status i {400, 500, 503} och en body vars `detail` är ett objekt med `type` och `message` → samma status, det inre `detail`-objektet oförändrat (aldrig `{"detail": {"detail": …}}`), och `Retry-After` vidarebefordrad om den finns. Inga andra headers passerar.
-   - Allt annat (422 från pydantic i `render`, HTML, ogiltig JSON, oväntad status) → 502 `render_unavailable` med ett generiskt meddelande; `render`s svar loggas server-side.
+   - Allt annat (422 från pydantic i kärnan, HTML, ogiltig JSON, oväntad status) → 502 `render_unavailable` med ett generiskt meddelande; svaret loggas server-side.
    - `httpx.TransportError` (inklusive timeout) → 502 `render_unavailable`. Meddelandet nämner varken undantagstexten eller värdnamnet `render`.
 
-### Två images, två versionsserier
-
-`backend` och `render` byter takt: produktkod veckovis, TeX-miljön några gånger om året. En gemensam tagg skulle tvinga varje produktrelease att flytta 9 GB basimage genom CI igen (#39). Därför:
+### En image från kärnan, en pin i klartex.se
 
 | | `backend` | `render` |
 |---|---|---|
-| Katalog | `backend/` | `render/` |
-| Paket | `klartex_se` | `klartex_render` |
-| Image | `ghcr.io/swedev/klartex-se-backend:<v>` | `ghcr.io/swedev/klartex-se-render:<v>` |
-| Tagg | `v0.6.0` | `render-v0.1.0` |
-| `.env` | `BACKEND_VERSION` | `RENDER_VERSION` |
-| Bas | `python:3.12-slim` | `ghcr.io/swedev/klartex-base` (pinnad tagg + digest) |
+| Byggs av | klartex.se | `swedev/klartex` vid varje release |
+| Katalog | `backend/` | — (ingen källa i detta repo) |
+| Image | `ghcr.io/swedev/klartex-se-backend:<appversion>` | `ghcr.io/swedev/klartex-render:<kärnversion>` |
+| Tagg som släpper | `v0.6.0` | kärnans egen release |
+| `.env` | `BACKEND_VERSION` | `KLARTEX_VERSION` |
+| Bas | `python:3.12-slim` | `ghcr.io/swedev/klartex-base` (kärnan pinnar) |
 
-`klartex`-pinnen ska vara identisk i båda `pyproject.toml` — discovery-scheman i `backend` och renderaren i `render` måste komma från samma kärnversion. Tre saker håller det sant:
+`KLARTEX_VERSION` är inte en egen versionsserie utan en avledning: **källan är `klartex==X.Y.Z` i `backend/pyproject.toml`**. Tre saker håller det sant:
 
-- Båda `Dockerfile` installerar projektet från sin `pyproject.toml` (`COPY pyproject.toml src/ … && pip install .`) i stället för att upprepa beroendelistan, så pinnen finns på ett ställe per tjänst.
-- CI kontrollerar med en rad att de två pinnarna är lika.
-- Båda health-endpoints rapporterar den installerade kärnversionen (`"klartex": importlib.metadata.version("klartex")`; i `backend` läggs fältet till i `main.py` i PR 2). Deployen av `backend` jämför `backend`s och `render`s värden efter omstarten och fallerar vid skillnad; deployen av `render` skriver bara ut dem (under Fas 1 saknar monoliten fältet, vilket utskriften tål).
+- `infra/.env.example` bär samma värde, och CI felar om de två skiljer sig.
+- Deployen skriver **både** `BACKEND_VERSION` och `KLARTEX_VERSION` till serverns `.env` vid varje backend-deploy. En kärnbump är därmed en PR plus en tagg, utan ssh; en rollback via `workflow_dispatch` från en äldre tagg återställer det matchande paret.
+- Health-svaren jämförs efter omstarten: `backend`s `klartex`-fält mot `render`s `version`-fält (kärnan rapporterar sin egen version som `version`).
 
-En kärnbump rullas alltid ut i ordningen `render` först, `backend` sedan. Fönstret däremellan är ofarligt: `render` validerar varje anrop mot *sin* kärnas schema, så en klient som byggt sitt dokument mot `backend`s äldre discovery-schema får det renderat av en nyare kärna, vilken är bakåtkompatibel inom samma major. Den farliga riktningen — `backend` nyare än `render`, där discovery erbjuder block som renderaren inte känner — är den deploy-kontrollen förhindrar. Bumpen är två taggar samma dag, ingen ceremoni utöver det.
-
-### Utrullning i två steg
-
-Compose-filen efter splitten refererar `${RENDER_VERSION:?}`. Den första deployen efter mergen måste därför vara `render-v0.1.0`: den skriver `RENDER_VERSION` till serverns `.env`, startar `render` bredvid den gamla monoliten (som fortsätter kompilera själv), och ingenting utåt ändras. Därefter `v0.6.0`, som byter `backend` till slim-imagen som proxar. Deployas i fel ordning stannar `docker compose pull` på den saknade variabeln — före omstarten, så den körande stacken rörs inte.
-
-Rollback: `workflow_dispatch` från `v0.5.0` checkar ut det trädet, rsyncar dess compose-fil (utan `render`-tjänst) och startar om; `--remove-orphans` i systemd-uniten tar bort den föräldralösa `render`-containern.
+Rollback till `v0.5.x` fungerar oförändrat: den taggens compose-fil saknar `render`, och `--remove-orphans` i systemd-uniten städar containern. En kvarvarande `KLARTEX_VERSION=`-rad i `.env` är harmlös.
 
 ## Steg
 
-### Fas 1: `render`-tjänsten (PR 1)
+### Fas 0: Återställ deploybarheten (PR 0)
 
-1. Skapa `render/` som ett eget litet Python-projekt
-   - `render/pyproject.toml`: namn `klartex-se-render`, version `0.1.0`, beroenden `klartex==0.15.0`, `fastapi`, `uvicorn[standard]`; dev: `pytest`, `httpx`
-   - `render/src/klartex_render/__init__.py`: `__version__ = "0.1.0"`
-   - `render/src/klartex_render/main.py`: FastAPI-app med `GET /health` (`status`, `version`, `klartex`) och `POST /render`; `docs_url=None`, `openapi_url=None`; en middleware som avvisar `Content-Length` över `MAX_REQUEST_BYTES` (~80 MB — största giltiga bundle i base64 plus data) med 413 innan kroppen läses
-   - `render/src/klartex_render/render.py`: `RenderRequest` (`template`, `data`, `page_template_source: str | None`, `assets: dict[str, str]`), asset-validering (`ASSET_NAME_RE`, gräns per fil och antal — samma värden som registret; ogiltig base64 → 400 `input_error`), tempkatalog per anrop, semaforen `MAX_CONCURRENT_RENDERS = 2`, `_block_error_path` + `_BLOCK_ERROR_RE`, felmappningen från dagens `backend/src/klartex_se/render.py`
-2. Kopiera de kärnnära testerna (de tas bort ur `backend/tests/` först i Fas 2, så monoliten förblir testad tills den byts)
-   - `render/tests/test_render.py`: xelatex-beroende render-tester (`needs_xelatex`-skip som idag), `_block_error_path`-enhetstester, `detail.path`-tester, semafortester, asset-tester (bundle med logotyp renderar; ogiltigt filnamn → 400; ogiltig base64 → 400; för stor asset → 400; för stor `Content-Length` → 413). Utgå från dagens `backend/tests/test_render.py`.
-3. `render/Dockerfile`
-   - Dagens `backend/Dockerfile` med `klartex_render.main:app`, samma `FROM`-pin, `COPY pyproject.toml src/` + `pip install --no-cache-dir .` i venvet, samma `HEALTHCHECK` mot `http://localhost:8000/health`
-4. `render/README.md` (svenska): syfte, kontraktet ovan, lokal körning (`uvicorn klartex_render.main:app --port 8001`), att den aldrig ska exponeras publikt
-5. Compose och deploy för `render`
-   - `infra/docker-compose.yml`: ny tjänst `render` (image `ghcr.io/swedev/klartex-se-render:${RENDER_VERSION:?…}`, inga `ports`, inga volymer, ingen `environment`, resurstak enligt designbeslut 6, healthcheck, `restart: unless-stopped`); nätverket `render` med `internal: true`; `backend` läggs på både `default` och `render`. Taken i PR 1 är övergångsvärden: `render` 1536m och monoliten `backend` sänkt från 2560m till 1792m, så att summan (3328m) ryms under värdens 4 GB med marginal för OS, Docker och Caddy medan båda kan kompilera. PR 2 sätter slutvärdena (designbeslut 6)
-   - `infra/.env.example`: `RENDER_VERSION=0.1.0` med kommentar om versionsserien
-   - `.github/workflows/deploy.yml`: trigger på `render-v[0-9]+.[0-9]+.[0-9]+` utöver `v…`; nytt jobb `resolve` som ur taggen härleder `service` (`backend`/`render`), `version`, `context`, `image`, `env_var` och verifierar mot rätt `pyproject.toml`; `build` och `deploy` parametriseras på dess outputs. Smoke-testet för `render`: `GET /health` + `POST /render` → PDF (dagens test med ny path). Deploy-steget skriver bara `${env_var}=${version}` i `.env`, `docker compose ps`-kontrollen omfattar `backend render caddy`, och versionsverifieringen för `render` går via `docker compose exec -T render curl -fsS http://localhost:8000/health` (porten är inte publicerad) följt av en riktig render (`POST /render` med minimal `_block`-body → `%PDF`) medan `restore`-trappen fortfarande är armerad. Health-utskriften visar båda tjänsternas `klartex`-version
-   - `.github/workflows/ci.yml`: matris över `backend` och `render` (`pip install -e '.[dev]' && pytest -q -rs` i respektive katalog) plus ett steg som kontrollerar att `klartex==`-pinnen är identisk i båda `pyproject.toml`
-6. `infra/README.md`: tabellraden för `docker-compose.yml`, avsnittet "Uppgradera" får ett stycke om `render-v*`-serien, felsökningens `logs`-exempel
+`main` bär en compose-fil som kräver `${RENDER_VERSION:?}` och en deploy som kontrollerar att en `render`-tjänst kör. Ingen av delarna finns på servern, så varje `v0.5.x`-tagg från `main` stannar vid `docker compose pull` — restore-trappen återställer, stacken förblir orörd och deployen blir röd. `pins`-jobbet i CI felar dessutom så snart backendens kärn-pin bumpas. PR 0 tar bort båda hindren och återställer stacken till `v0.5.0`:s form.
 
-**PR 1 är deploybar och ofarlig:** `render-v0.1.0` startar en tjänst ingen anropar än.
+1. Ta bort `render/` i sin helhet — kärnan äger render-tjänsten, klartex.se har ingen källa för den.
+2. `infra/docker-compose.yml`: ta bort tjänsten `render` och det interna nätverket `render`; `backend` tillbaka på ett enda nätverk med taken 2560m / 1.5 CPU.
+3. `.github/workflows/deploy.yml`: ta bort `render-v*`-triggern och `resolve`-jobbet; tillbaka till ett `v*`-flöde som bygger, smoke-testar, publicerar och rullar ut `backend`.
+4. `.github/workflows/ci.yml`: ta bort `render`-posten ur matrisen och hela `pins`-jobbet — det finns bara en pin att vakta, och den vaktas mot `.env.example` från och med PR 2b.
+5. `infra/.env.example`: ta bort `RENDER_VERSION`.
+6. `infra/README.md`: rensa alla render-referenser (tabellrader, "Uppgradera", GHCR-avsnittet, säkerhet, felsökning).
 
-### Fas 2: `backend` blir policy-lagret (PR 2)
+**Resultatet:** stacken är två containrar (`backend`, `caddy`), `docker compose config` kräver bara `BACKEND_VERSION` med `API_TOKEN` valfri, och en `v0.5.1` kan släppas samma dag. PR 0 stänger inget issue: `Refs #46`. Tier `light`.
+
+### Fas 1: Kom ikapp kärnan (PR 2a)
+
+Körs på den monolitiska imagen, innan render-imagen konsumeras. Kräver att kärnreleasen från swedev/klartex#81 finns på PyPI.
+
+1. `backend/pyproject.toml` + `backend/src/klartex_se/__init__.py`: bumpa `klartex==` till den releasen.
+2. `backend/src/klartex_se/render.py`: `klartex.render()` tar inte längre `page_template_source`. Anropet skickar `header_source`; utan bundle skickas ingen källa alls.
+3. **Aliasen försvinner ur det publika API:t** (Designbeslut 2). `BUILTIN_PAGE_TEMPLATES` raderas. `page_template` blir `str | object`: sträng = registrerat bundle-namn, objekt = kärnans slot-form rakt igenom. Ingen mappning, ingen kvarlevande konvention.
+4. **Bundle-shimmen** (Designbeslut 11): registret bär en monolitisk `page_template.tex.jinja`. Den skickas som `header_source` och `data.page_template.footer` sätts till `null`, vilket ger samma emission som en delad källa utan footer. Bundlen vinner över ett anropar-skickat `footer`; det dokumenteras i `backend/README.md`.
+5. Publika exempel rensas från alias-namnen: `RenderRequest`-exemplen i `render.py`, `backend/README.md`, `llms.txt` och `index.html`.
+6. Tester: `page_template` som objekt når kärnan oförändrat, sträng slår upp bundlen, okänt namn → 400, shimmen sätter `header_source` + `footer: null`, inget test refererar `formal`/`clean`/`none`.
+7. Release-noten nämner att kärnans footer-variant `standard` heter `pagenumber` (inget i klartex.se refererar den) och att inline-markup tolkas i fler block — det senare noteras för #14, ingen kodändring.
+
+Tier `full` — det publika kontraktet ändras.
+
+### Fas 2: Proxy, slim image och konsumtion av render-imagen (PR 2b)
+
+Kräver att `ghcr.io/swedev/klartex-render:<pin>` finns på GHCR och är publik.
 
 1. `backend/src/klartex_se/render_client.py` (ny)
    - `RENDER_URL = os.environ.get("RENDER_URL", "http://render:8000")`
    - `class RenderUpstreamError(Exception)` med `status_code`, `detail`, `headers`
-   - `render_pdf(template, data, page_template_source, assets) -> bytes` med en modulglobal `httpx.Client` och tidsbudgeten från Angreppssätt (connect 5 / read 130 / write 30 / pool 5). Svarsalgoritmen exakt som i Angreppssätt: 200 → bytes; {400, 500, 503} med validerat `detail`-objekt → `RenderUpstreamError(status, detail, {"Retry-After": …} om satt)`; allt annat och alla `httpx.TransportError` → `RenderUpstreamError(502, {"type": "render_unavailable", "message": "The render service did not answer. Retry in a few seconds."})` med `log.warning` som bär status och början av kroppen
-   - Klienten byggs så att den går att ersätta i test: `httpx.Client(transport=…)` via en modulfunktion `_client()` som tester kan monkeypatcha
-2. `backend/src/klartex_se/render.py`
-   - Ta bort `_block_error_path`, `_BLOCK_ERROR_RE` och importen av `klartex.render`; semaforen blir `MAX_INFLIGHT_RENDERS = 2` och tas *före* bundle-laddningen så att den täcker både payload-bygget och proxy-anropet, med samma 503 `overloaded` som idag
-   - Bundle-grenen läser `page_template.tex.jinja` plus alla filer i `asset_names` ur metadata och base64:ar dem (hjälpare `load_bundle_payload(name) -> tuple[str, dict[str, str]]` i `page_templates.py`; en asset som saknas på disk eller en template-källa som inte är giltig UTF-8 ger `PageTemplateError` → 400 `input_error`, eftersom bundlen då är trasig, inte anropet)
-   - Anropa `render_pdf`; `except RenderUpstreamError as e: raise HTTPException(e.status_code, detail=e.detail, headers=e.headers)`
-   - `responses`-dokumentationen: 502 tillkommer; 503 beskriver `overloaded` som antingen `backend`s eller `render`s
-3. `backend/pyproject.toml` + `__init__.py`: version `0.6.0`; `httpx>=0.27` flyttas från dev till huvudberoenden
-4. `backend/Dockerfile`
-   - `FROM python:3.12-slim`; venv med `klartex`, `fastapi`, `uvicorn`, `httpx`, `python-multipart`; `HEALTHCHECK` via `python -c "import urllib.request; …"` (slim har ingen curl — samma mönster som styrlas compose)
-5. `backend/tests/test_render.py`
-   - `fake_render`-fixturen monkeypatchar `render_module.render_pdf` i stället för `klartex_render`; ta bort de tester som kopierades till `render/tests/` i Fas 1; behåll tier-/403-/`find_latex_block`-/carrier-pinning-testerna; nya tester: 403 för `latex` sker utan att `render_pdf` anropas, bundle-payload byggs rätt (`page_template_source` + `assets`), inbyggd sidmall mergas in i `data`, `RenderUpstreamError` 400/503 passerar med status, `detail` och `Retry-After`, in-flight-semaforen ger 503 vid full, transportfel → 502 `render_unavailable`
-   - `backend/tests/test_render_client.py` (ny): `render_pdf` mot en `httpx.MockTransport` — 200 → bytes, 400 med `detail` → `RenderUpstreamError(400)`, 503 med `Retry-After` → header vidarebefordrad, 422/HTML/ogiltig JSON/okänd status → 502, `httpx.ConnectError`/`ReadTimeout` → 502, meddelandet innehåller inte värdnamnet
-   - `backend/tests/test_contract.py` (ny): kontraktstest end-to-end i process — `_client()` monkeypatchas till `starlette.testclient.TestClient(klartex_render.main.app)`, som är en synkron `httpx.Client`-subklass med egen transport och tar absoluta URL:er oavsett värdnamn, så att `backend`s payload verkligen parsas av `render`s pydantic-modell och `render`s felform verkligen passerar `backend`s validering. Utan xelatex täcks `validation_error`/`input_error` med `path` och asset-valideringen; med xelatex även en riktig PDF. Kräver att `render` är installerat i `backend`s testmiljö (CI: `pip install -e ../render` i backend-jobbet — billigt, ingen TeX)
-   - `backend/tests/test_page_templates.py`: nya enhetstester för `load_bundle_payload` — normal bundle, asset som saknas på disk, template-källa som inte är UTF-8, bundle som tas bort mellan `get_bundle_path` och läsning (→ `PageTemplateNotFound`)
-6. `infra/docker-compose.yml`: `backend` får `RENDER_URL` (dokumenterande — defaulten gäller), `depends_on: render: condition: service_healthy`, sänkta tak (designbeslut 6); volymen `./page-templates` ligger kvar enbart på `backend`. **Compose-healthchecken för `backend` byts** från `curl` till samma `python -c "import urllib.request; …"` som imagen — compose-nivåns `healthcheck:` åsidosätter imagens, och slim-imagen har ingen curl, så utan bytet blir `backend` aldrig `healthy` och Caddy startar inte
-7. `.github/workflows/deploy.yml`: smoke-testet för `backend` körs som en tvåcontainer-stack — `render` pullas på den version `infra/.env.example` pinnar (`RENDER_VERSION`), `backend` är den nybyggda imagen, båda på ett tillfälligt Docker-nätverk — och kör `GET /api/health`, `GET /api/templates` innehåller `_block`, `POST /api/render` med `latex`-block → 403, `POST /api/render` med minimal `_block`-body → `%PDF` (hela kedjan `backend → render → xelatex`), och kontrollerar att `klartex`-versionen i båda health-svaren är lika. Pullen av `render`-imagen kostar ~2 min per `backend`-release; det är release-tid och accepterat. Efter omstarten på servern gör deployen samma render-anrop mot `127.0.0.1:8000/api/render` innan `restore`-trappen släpps
-8. `infra/Caddyfile`: `response_header_timeout` 150 s → 180 s, kommentaren bär tidsbudgeten (xelatex 2 × 60 s → httpx värsta fall 165 s → Caddy 180 s)
+   - `render_pdf(template, data, header_source, footer_source, assets) -> bytes` med en modulglobal `httpx.Client` och tidsbudgeten ovan; svarsalgoritmen exakt som i Angreppssätt steg 6
+   - Klienten byggs via en modulfunktion `_client()` som tester kan monkeypatcha
+2. `backend/src/klartex_se/render.py`: kompileringen, felmappningen och `_block_error_path` bort; semaforen blir `MAX_INFLIGHT_RENDERS = 2` och tas *före* bundle-laddningen så att den täcker både payload-bygget och proxy-anropet; `RenderUpstreamError` → `HTTPException` med status, detail och headers; `responses`-dokumentationen får 502.
+3. `backend/src/klartex_se/page_templates.py`: `load_bundle_payload(name) -> tuple[str, dict[str, str]]` — template-källa plus assets som base64. En asset som saknas på disk eller en källa som inte är giltig UTF-8 ger `PageTemplateError` → 400 `input_error`; bundlen är då trasig, inte anropet.
+4. `backend/pyproject.toml` + `__init__.py`: version `0.6.0`; `httpx>=0.27` som huvudberoende; `klartex[serve]` i `dev`-extran för kontraktstestet. `klartex` förblir runtime-beroende för discovery.
+5. `backend/Dockerfile`: `FROM python:3.12-slim`; venv med `klartex`, `fastapi`, `uvicorn`, `httpx`, `python-multipart`; `HEALTHCHECK` via `python -c "import urllib.request; …"` (slim har ingen curl).
+6. Tester
+   - `backend/tests/test_render.py`: `fake_render`-fixturen monkeypatchar `render_pdf`; behåll tier-, 403-, `find_latex_block`- och carrier-pinning-testerna; nya för payload-bygge, upstream-passthrough (400/503 med `Retry-After`), in-flight-semaforen och 502 vid transportfel
+   - `backend/tests/test_render_client.py` (ny): `render_pdf` mot `httpx.MockTransport` — 200 → bytes, 400/503 → `RenderUpstreamError`, 422/HTML/ogiltig JSON/okänd status → 502, `ConnectError`/`ReadTimeout` → 502, meddelandet innehåller inte värdnamnet
+   - `backend/tests/test_contract.py` (ny): kontraktstest i process — `_client()` monkeypatchas till `starlette.testclient.TestClient(klartex.server.app)`, så att `backend`s payload verkligen parsas av kärnans pydantic-modell och kärnans felform verkligen passerar `backend`s validering
+   - `backend/tests/test_page_templates.py`: enhetstester för `load_bundle_payload` inklusive trasiga bundles
+7. `infra/docker-compose.yml`
+   - `render: image: ghcr.io/swedev/klartex-render:${KLARTEX_VERSION:?…}`, inga `ports`, inga volymer, ingen `environment` med hemligheter, `restart: unless-stopped`
+   - Nätverket `render` med `internal: true`; `backend` på både `default` och `render`, med `depends_on: render: condition: service_healthy`
+   - Compose-proben använder samma URL som imagens `HEALTHCHECK`
+   - **Härdning** (Designbeslut 10): `security_opt: [no-new-privileges:true]`, `cap_drop: [ALL]`, `read_only: true`, `tmpfs: [/tmp:size=512m]` och en skrivbar `HOME` på tmpfs (fontconfig kräver det, annars loggas "No writable cache directories" per körning)
+   - Slutgiltiga tak: `render` 1792m / 1.5 CPU / `pids_limit 256`, `backend` 768m / 0.5 CPU / `pids_limit 128`
+   - Compose-healthchecken för `backend` byts till samma `python -c "import urllib.request; …"` som imagen — compose-nivån åsidosätter imagens, och slim-imagen har ingen curl
+8. `infra/.env.example`: `KLARTEX_VERSION` med samma värde som backendens `klartex==`-pin, och `BACKEND_VERSION=0.6.0`.
+9. `.github/workflows/ci.yml`: ett steg som felar om `KLARTEX_VERSION` i `.env.example` skiljer sig från `klartex==`-pinnen i `backend/pyproject.toml`.
+10. `.github/workflows/deploy.yml`
+    - Smoke-testet startar en tvåcontainer-stack: `ghcr.io/swedev/klartex-render:<pin>` pullad från GHCR plus den nybyggda `backend`-imagen på ett tillfälligt nätverk. Kör `GET /api/health`, `GET /api/templates` innehåller `_block`, `POST /api/render` med `latex`-block → 403, och `POST /api/render` med minimal `_block`-body → `%PDF` (hela kedjan)
+    - Deploy-steget skriver både `BACKEND_VERSION` och `KLARTEX_VERSION` till serverns `.env`; `docker compose ps`-kontrollen omfattar `backend render caddy`; efter omstarten jämförs `backend`s `klartex`-fält mot `render`s `version`-fält, och ett riktigt render-anrop körs medan restore-trappen fortfarande är armerad
+11. `infra/Caddyfile`: `response_header_timeout` 180 s, med tidsbudgeten i kommentaren.
+12. Dokumentation i nu-state: `backend/README.md` (rollen som policy-lager, 502 i felsvarstabellen, belastningstaket ligger i `render`, slim-imagen, lokal utveckling mot `RENDER_URL=http://localhost:8001` med `klartex serve`), `infra/README.md` (två tjänster, en pin, härdningen, säkerhet, felsökning), `PLAN.md` (API-image och hosting), `CLAUDE.md` (kärnprincip 1: kompilering sker i kärnans render-image, `backend/` är policy).
 
-### Fas 3: Dokumentation i nu-state (i PR 2)
+PR 2b bär `Closes #46, closes #47`. Tier `full`.
 
-1. `backend/README.md`: inledningen beskriver rollen som policy-lager; endpoint-tabellen oförändrad; felsvarstabellen får `render_unavailable` 502 och `overloaded` beskrivs som `render`s svar; "Belastningstak"-avsnittet pekar på `render`; Docker-avsnittet beskriver slim-imagen; "Bumpa basimagen" flyttar till `render/README.md`; lokal utveckling visar `RENDER_URL=http://localhost:8001` mot en lokalt startad render
-2. `infra/README.md`: "Vad ligger var", "Från noll till live" (`.env` bär två versioner), "Uppgradera" (två serier, utrullningsordningen efter splitten), "Rate limit"-avsnittet (taken sitter nu på `render`), "Säkerhet" (render har inga hemligheter, inget nätverk utåt, ingen publicerad port)
-3. `PLAN.md`: raden **API-image** i beslutstabellen (två images, två serier), **Hosting**-raden (fyra containrar när Postgres kommer), risktabellens rad om `/api/render` (kompileringen kör utan hemligheter i miljön och utan nätverk; filläsning inom containern kvarstår tills swedev/klartex#51)
-4. `CLAUDE.md`: kärnprincip punkt 1 nämner `render/` som den enda platsen som anropar `klartex.render()`; tabellen "Relaterade repon" oförändrad
+### Fas 3: Utrullning och mätning
 
-### Fas 4: Utrullning
-
-1. Merga PR 1 → tagga `render-v0.1.0`. Stannar `docker compose pull` på paketets synlighet: sätt `klartex-se-render` publikt och kör om via `workflow_dispatch` (se triagenoteringen). Verifiera i deploy-loggen att `render` är `healthy`, att dess interna render gav PDF och att `/api/render` fortfarande svarar (monoliten kompilerar än)
-2. **Mät innan PR 2 mergas:** med `render-v0.1.0` i produktion, kör två samtidiga renders mot `render` (via `docker compose exec`) och läs `docker stats` — det avgör om 1792m i designbeslut 6 håller eller ska justeras i PR 2, inte efteråt. Kör mätningen under en lugn stund: monoliten kan kompilera samtidigt, och övergångstaken i PR 1 är satta för att båda ska rymmas
-3. Merga PR 2 → tagga `v0.6.0` → verifiera `curl -fsS https://app.klartex.se/api/health` rapporterar `0.6.0` och samma `klartex` som `render`, en render med inbyggd sidmall ger PDF, en render med registrerad bundle (t.ex. `vkf`) ger PDF med logotyp, ett anonymt `latex`-block ger 403
-4. Kontrollera på servern att `render`-containerns miljö saknar `API_TOKEN` (`docker compose exec render env`) — det är hela poängen med #47 — och att `docker compose exec render curl -m 5 https://example.com` misslyckas
-5. Uppdatera #19 med att `backend` är platsen för Postgres/parla och att minnesmarginalen (designbeslut 6) är en förutsättning där; stäng #47 via PR 2:s `Closes`
+1. Merga PR 2b → tagga `v0.6.0`. Stannar `docker compose pull` på paketets synlighet: sätt `klartex-render` publikt i kärnorganisationens paketvy och kör om via `workflow_dispatch`.
+2. Verifiera: `/api/health` rapporterar 0.6.0 och samma kärnversion som `render`; render med registrerad bundle ger PDF med logotyp; anonymt `latex`-block ger 403.
+3. Kontrollera på servern att `docker compose exec render env` saknar `API_TOKEN` och att `curl -m 5 https://example.com` från `render` misslyckas.
+4. Mät med `docker stats --no-stream` under en riktig rendering; justera taken i en följdcommit. Uppdatera #19 med att `backend` är platsen för Postgres/parla och att minnesmarginalen är en förutsättning där.
 
 ## Filöversikt
 
-| Fil | Åtgärd | Syfte |
-|-----|--------|-------|
-| `render/pyproject.toml` | Skapa | `klartex-se-render` 0.1.0; samma `klartex`-pin som backend |
-| `render/src/klartex_render/__init__.py` | Skapa | `__version__` |
-| `render/src/klartex_render/main.py` | Skapa | FastAPI-app: `GET /health`, `POST /render`; inga docs |
-| `render/src/klartex_render/render.py` | Skapa | Inline-assets → tempkatalog, `klartex.render`, semafor, felmappning (`_block_error_path` flyttar hit) |
-| `render/tests/test_render.py` | Skapa | Kärnnära tester flyttade från `backend/tests/` + asset-/kontraktstester |
-| `render/Dockerfile` | Skapa | Dagens backend-Dockerfile på `klartex-base`, ny app-modul |
-| `render/README.md` | Skapa | Kontrakt, lokal körning, basimage-bump |
-| `backend/src/klartex_se/render_client.py` | Skapa | `render_pdf`, `RenderUpstreamError`, `RENDER_URL`, `_client()` med tidsbudgeten |
-| `backend/src/klartex_se/main.py` | Ändra | `/api/health` rapporterar även `klartex` (installerad kärnversion) |
-| `backend/src/klartex_se/render.py` | Ändra | Policy + bundle-payload + proxy; kompilering, semafor och felmappning bort |
-| `backend/src/klartex_se/page_templates.py` | Ändra | `load_bundle_payload(name)` — template-källa + assets som base64 |
-| `backend/pyproject.toml`, `backend/src/klartex_se/__init__.py` | Ändra | 0.6.0; `httpx` som huvudberoende |
-| `backend/Dockerfile` | Ändra | `FROM python:3.12-slim`; healthcheck via urllib |
-| `backend/tests/test_render.py` | Ändra | `fake_render` → `render_pdf`; in-flight-semafor, upstream-passthrough- och 502-tester; xelatex-tester bort |
-| `backend/tests/test_render_client.py` | Skapa | `render_pdf` mot `httpx.MockTransport`: statusar, headers, trasiga svar, transportfel |
-| `backend/tests/test_contract.py` | Skapa | Kontraktstest `backend → render` i process via Starlettes `TestClient` som `_client()` |
-| `backend/tests/test_page_templates.py` | Ändra | Enhetstester för `load_bundle_payload` inklusive trasiga bundles |
-| `backend/README.md` | Ändra | Roll, felsvarstabell (502), belastningstak, Docker, lokal utveckling |
-| `infra/docker-compose.yml` | Ändra | Tjänst `render` (intern, utan hemligheter/portar/volymer), nätverk `render` (`internal: true`), `RENDER_VERSION`, `depends_on`, nya resurstak |
-| `infra/.env.example` | Ändra | `RENDER_VERSION`; `BACKEND_VERSION=0.6.0` |
-| `infra/Caddyfile` | Ändra | `response_header_timeout` 150 s → 180 s med tidsbudgeten i kommentaren; proxar fortfarande `backend:8000` |
-| `infra/README.md` | Ändra | Två tjänster, två versionsserier, utrullningsordning, säkerhetsavsnitt |
-| `.github/workflows/deploy.yml` | Ändra | `render-v*`-trigger; `resolve`-jobb; parametriserat bygge/smoke/deploy; verifiering av båda tjänsterna |
-| `.github/workflows/ci.yml` | Ändra | Matris `backend`/`render`; backend-jobbet installerar även `../render` för kontraktstestet; pin-likhetskontroll |
-| `PLAN.md` | Ändra | Beslutstabell (API-image, hosting) och risktabell i nu-state |
-| `CLAUDE.md` | Ändra | Kärnprincip 1: `render/` kompilerar, `backend/` är policy |
-
-Oförändrade men värda att nämna: `infra/cloud-init.yaml`, `llms.txt`, `index.html` (det publika API:t ändras inte).
+| Fil | Fas | Åtgärd | Syfte |
+|-----|-----|--------|-------|
+| `render/` | 0 | Ta bort | Kärnan äger render-tjänsten |
+| `infra/docker-compose.yml` | 0 | Ändra | Tillbaka till `backend` + `caddy`, tak 2560m / 1.5 CPU |
+| `infra/.env.example` | 0 | Ändra | `RENDER_VERSION` bort |
+| `infra/README.md` | 0 | Ändra | Render-referenser bort |
+| `.github/workflows/deploy.yml` | 0 | Ändra | Ett `v*`-flöde; `render-v*` och `resolve` bort |
+| `.github/workflows/ci.yml` | 0 | Ändra | Matrisen och `pins`-jobbet bort |
+| `backend/pyproject.toml`, `backend/src/klartex_se/__init__.py` | 1, 2 | Ändra | Kärn-pin; 0.6.0; `httpx`; `klartex[serve]` i dev |
+| `backend/src/klartex_se/render.py` | 1, 2 | Ändra | `header_source`; aliasen bort; policy + proxy |
+| `backend/src/klartex_se/page_templates.py` | 2 | Ändra | `load_bundle_payload` |
+| `backend/src/klartex_se/main.py` | 2 | Ändra | `/api/health` rapporterar även `klartex` |
+| `backend/src/klartex_se/render_client.py` | 2 | Skapa | `render_pdf`, `RenderUpstreamError`, tidsbudget |
+| `backend/Dockerfile` | 2 | Ändra | `python:3.12-slim`, healthcheck via urllib |
+| `backend/tests/test_render.py` | 1, 2 | Ändra | Aliastester bort; proxy- och passthrough-tester |
+| `backend/tests/test_render_client.py` | 2 | Skapa | `httpx.MockTransport`: statusar, headers, transportfel |
+| `backend/tests/test_contract.py` | 2 | Skapa | `backend → klartex.server` i process |
+| `backend/tests/test_page_templates.py` | 2 | Ändra | `load_bundle_payload`, trasiga bundles |
+| `backend/README.md` | 1, 2 | Ändra | `page_template`-kontraktet, 502, slim-imagen |
+| `llms.txt`, `index.html` | 1 | Ändra | Alias-namnen bort ur publika exempel |
+| `infra/docker-compose.yml` | 2 | Ändra | `render` från kärnans image, internt nät, härdning, slutgiltiga tak |
+| `infra/.env.example` | 2 | Ändra | `KLARTEX_VERSION`; `BACKEND_VERSION=0.6.0` |
+| `infra/Caddyfile` | 2 | Ändra | `response_header_timeout` 180 s |
+| `.github/workflows/deploy.yml` | 2 | Ändra | Tvåcontainer-smoke; båda `.env`-raderna; versionsjämförelse |
+| `.github/workflows/ci.yml` | 2 | Ändra | `.env.example` == `pyproject.toml`-pinnen |
+| `PLAN.md`, `CLAUDE.md` | 2 | Ändra | Beslutstabell, risktabell, kärnprincip 1 |
 
 ## Berörda kodområden
 
 - `backend/` (src, tests, Dockerfile, README)
-- `render/` (nytt)
-- `infra/` (compose, .env.example, README)
+- `infra/` (compose, Caddyfile, .env.example, README)
 - `.github/workflows/`
-- `PLAN.md`, `CLAUDE.md`
+- `llms.txt`, `index.html`, `PLAN.md`, `CLAUDE.md`
 
 ## Designbeslut
 
-> Icke-triviala val gjorda under planeringen. Feedback välkommen; annars implementeras enligt dessa.
+> Varje beslut bär sin proveniens. Användarbesluten är fattade; agentens bedömningar är öppna att ifrågasätta.
 
-### 1. Namn: `backend` behålls för app-tjänsten, `render` är ny
-**Alternativ:** A: byta namn på tjänst/katalog/image/env till `app` som issuet skriver, vs B: behålla `backend` överallt och bara lägga till `render`.
+### 1. Render-tjänsten är kärnans artefakt och versioneras som kärnan
+**Beslut:** `swedev/klartex` bygger och publicerar `ghcr.io/swedev/klartex-render:<kärnversion>` vid varje release. klartex.se bygger den aldrig, pinnar den, och har en egen appversion.
+**Motivering:** Det finns ingen kärnrelease som lämnar render-motorn orörd och ingen ändring i render-motorn som inte är en kärnrelease — två versionsserier i klartex.se skulle vara två namn på samma sak. Frågan "en eller två serier i klartex.se" upplöses därmed.
+*Användarbeslut, konversation 2026-08-30. Kärnhalvan spåras i swedev/klartex#81.*
+
+### 2. Aliasen `formal`/`clean`/`none` försvinner helt, även ur klartex.se:s publika API
+**Beslut:** `page_template` blir `str | object` — sträng = registrerat bundle-namn, objekt = kärnans slot-form rakt igenom. `BUILTIN_PAGE_TEMPLATES` raderas; `llms.txt`, `index.html`, README- och `RenderRequest`-exempel rensas i PR 2a. Ingen mappning, ingen kvarlevande konvention.
+**Motivering:** Kärnan tar bara `dict | None`. Att översätta namnen i klartex.se skulle bevara en konvention som inte finns någon annanstans, och `formal` i objektform kräver dessutom `org_name` och går bara att uttrycka som den bara varianten `"letterhead"` — en mappning skulle alltså inte ens vara trogen.
+*Användarbeslut A, konversation 2026-08-30.*
+
+### 3. En kärnrelease bär både alias-borttagningen och `klartex serve`
+**Beslut:** klartex.se migrerar en gång, mot en release.
+**Motivering:** Två migreringar mot två kärnreleaser vore två gånger arbetet och två fönster där repona kan glida isär.
+*Användarbeslut B, konversation 2026-08-30. Kärn-issue: swedev/klartex#81.*
+
+### 4. PR 0 körs direkt, före allt kärnberoende arbete
+**Beslut:** Deploybarheten återställs innan något väntar på kärnan.
+**Motivering:** `main` kan inte släppa en hotfix så länge compose kräver en variabel som inte finns på servern, och `pins`-jobbet blockerar pin-bumpen i PR 2a.
+*Användarbeslut C, konversation 2026-08-30.*
+
+### 5. Namnet `backend` behålls för app-tjänsten
+**Alternativ:** A: byta namn på tjänst/katalog/image/env till `app` som issuet skriver, vs B: behålla `backend` och bara lägga till `render`.
 **Beslut:** B.
-**Motivering:** `app` är redan upptaget på tre ställen: frontend-katalogen `app/` (PLAN.md:s beslut, #14-grenen), `~klartex/app` på servern och `/srv/app` i Caddyfile — alla frontend-dist. En compose-tjänst `app` bredvid dem skulle förvirra. Med B är katalog, image, env-variabel och tjänstenamn konsekventa (`backend/` ↔ `klartex-se-backend` ↔ `BACKEND_VERSION` ↔ `backend:8000`), Caddyfile och rollback-vägen rörs inte, och issuets "app" ↔ `backend` i detta repo. *Agentens bedömning — issuet använder `app` i prosan; namnet är öppet att ifrågasätta.*
+**Motivering:** `app` är upptaget på tre ställen: frontend-katalogen `app/`, `~klartex/app` på servern och `/srv/app` i Caddyfile. Med B är katalog, image, env-variabel och tjänstenamn konsekventa, och Caddyfile och rollback-vägen rörs inte.
+*Agentens bedömning, granskad — issuet använder `app` i prosan; namnet är öppet att ifrågasätta.*
 
-### 2. Assets skickas inline per anrop, ingen delad volym
-**Alternativ:** A: montera `./page-templates` read-only även i `render` och skicka bundle-namn, vs B: `backend` läser bundlen och skickar `page_template_source` + `assets` (base64) i anropet.
+### 6. Bundle-innehållet skickas inline per anrop, ingen delad volym
+**Alternativ:** A: montera `./page-templates` read-only även i `render`, vs B: `backend` läser bundlen och skickar källa + assets (base64) i anropet.
 **Beslut:** B.
-**Motivering:** A ger `render` kännedom om registrets layout — som #19 ändrar (per org) — och en volym som just issuet vill hålla borta från kompileringsprocessen. B gör `render` helt tillståndslöst och ger samma kontrakt som #18 vill exponera publikt. Kostnaden är att bundle-bytes (normalt hundratals kB, max ~51 MB) går över compose-nätverket per anrop; det är lokal trafik och acceptabelt för MVP-volymer. *Agentens bedömning; följer issuets "stateless wrapper" och #18.*
+**Motivering:** A ger render-tjänsten kännedom om registrets layout — som #19 ändrar — och en volym som issuet uttryckligen vill hålla borta från kompileringsprocessen. B gör tjänsten helt tillståndslös och ger samma kontrakt som #18 vill exponera publikt. Kostnaden är lokal trafik, hundratals kB i normalfallet.
+*Agentens bedömning, granskad.*
 
-### 3. `render` sätter felformerna, `backend` vidarebefordrar dem oförändrade
-**Alternativ:** A: `render` ger råa fel och `backend` tolkar om, vs B: `render` producerar exakt dagens `detail`-form och `backend` passar igenom status, `detail` och `Retry-After`.
+### 7. Kärnan sätter felformerna, `backend` vidarebefordrar dem oförändrade
+**Beslut:** `render` producerar `detail`-formerna; `backend` passar igenom status, `detail` och `Retry-After`, och lägger bara till `502 render_unavailable`.
+**Motivering:** Felmappningen beror på kärnans meddelandeformer och hör hemma där kärnan anropas. Anslutningsfel och timeout får samma typ — klienten kan inte agera olika på dem.
+*Agentens bedömning, granskad.*
+
+### 8. `backend` behåller `klartex` som beroende
+**Alternativ:** A: proxa även discovery så `backend` blir klartex-fritt, vs B: `backend` importerar `klartex` (utan TeX) för discovery och för `find_latex_block`s pinning mot kärnans carrier-block.
 **Beslut:** B.
-**Motivering:** Felmappningen (`_block_error_path`) beror på kärnans meddelandeformer och hör hemma där kärnan anropas. Det publika kontraktet i `backend/README.md` förblir därmed identiskt utom ett tillägg: `502 render_unavailable` vid anslutningsfel/timeout mot `render`. Anslutningsfel och timeout får samma typ — klienten kan inte agera olika på dem. *Agentens bedömning.*
+**Motivering:** `klartex` utan TeX Live väger några MB. Discovery-scheman är single source of truth och bör inte gå över nätet. Det som kostar är TeX-basen, och den lämnar `backend` oavsett.
+*Agentens bedömning, granskad; följer CLAUDE.md:s kärnprincip 2.*
 
-### 4. `backend` behåller `klartex` som beroende
-**Alternativ:** A: proxa även discovery till `render` så `backend` blir TeX- och klartex-fritt, vs B: `backend` importerar `klartex` (utan TeX) för discovery och för `find_latex_block`s pinning mot kärnans carrier-block.
-**Beslut:** B.
-**Motivering:** `klartex` utan TeX Live väger några MB och drar inga tunga beroenden; discovery-scheman är single source of truth och bör inte gå över nätet. Det som kostar är TeX-basen, och den lämnar `backend` oavsett. Priset är att båda tjänsterna måste pinna samma `klartex`-version; CI kontrollerar det med en rad. *Agentens bedömning; följer CLAUDE.md:s kärnprincip 2.*
+### 9. Resurstak: `render` 1792m / 1.5 CPU, `backend` 768m / 0.5 CPU
+**Beslut:** Sätts i PR 2b; summan (2560m) är oförändrad mot `v0.5.0`, så OS, Docker och Caddy behåller samma marginal.
+**Motivering:** `backend` får 768m för att två samtidiga bundle-payloads i värsta fall ska rymmas; in-flight-semaforen på 2 begränsar värsta fallet. CPU-taken summerar till 2,0 av 2 vCPU, och `backend` gör nästan inget CPU-arbete efter splitten. Siffran för `render` är **en uppskattning** och mäts med `docker stats` efter `v0.6.0`; taket justeras i en följdcommit. Postgres i #19 ryms inte i marginalen som den ser ut — antingen sänks `render` efter mätningen eller storleksändras värden till cax21.
+*Agentens bedömning, granskad; issuet begär just den här kontrollen.*
 
-### 5. Två versionsserier och två taggmönster i samma workflow
-**Alternativ:** A: en `v*`-tagg bygger båda images, vs B: `v*` → `backend`, `render-v*` → `render`, med ett `resolve`-jobb som parametriserar resten av `deploy.yml`.
-**Beslut:** B.
-**Motivering:** Hela poängen med cadence-argumentet i issuet är att en produktrelease inte ska flytta TeX-basen; A skulle behålla #39:s 8 minuter per release. B ger två oberoende serier med minimal ceremoni — en tagg per release, som idag — och en workflow-fil utan duplicerade SSH-steg. `concurrency: production-deploy` delas så två deployer aldrig interfolieras. *Agentens bedömning.*
+### 10. `render` på internt nätverk, härdad container
+**Beslut:** `internal: true`-nätverk utan gateway, plus `no-new-privileges`, `cap_drop: ALL`, `read_only: true`, tmpfs för `/tmp` och för `HOME`.
+**Motivering:** Nätverket stänger den enda vägen ut för en process som kör anroparstyrd LaTeX: innehåll kan inte lämna containern annat än i den PDF `backend` returnerar. Härdningen kostar sex rader och tar bort privilegie-eskalering och skrivbar rootfs. `HOME` måste vara skrivbar eller tmpfs, annars klagar fontconfig per körning. Gate:as av deployens riktiga render-anrop: trippar `read_only`, släpp den raden och notera fallet under swedev/klartex#51. Filläsning *inom* containern kvarstår tills swedev/klartex#51.
+*Agentens bedömning, granskad.*
 
-### 6. Resurstak: `render` 1792m / 1.5 CPU, `backend` 768m / 0.5 CPU
-**Alternativ:** Behålla 2560m på den tjänst som kompilerar, vs sänka.
-**Beslut:** Slutvärden i PR 2 — `render`: `mem_limit`/`memswap_limit` 1792m, `cpus 1.5`, `pids_limit 256`; `backend`: 768m/768m, `cpus 0.5`, `pids_limit 128`. Övergångsvärden i PR 1 (monoliten kompilerar än): `backend` 1792m, `render` 1536m.
-**Motivering:** Slutsumman (2560m) är oförändrad mot idag, så OS, Docker och Caddy behåller exakt den marginal de har nu (~1,5 GB på cax11:s 4 GB). `backend` får 768m för att två samtidiga bundle-payloads i värsta fall (~68 MB base64 vardera plus JSON-kopior) ska rymmas med marginal; in-flight-semaforen på 2 är det som gör värsta fallet begränsat. CPU-taken summerar till 2,0 av 2 vCPU; `backend` gör nästan inget CPU-arbete efter splitten, så Caddy konkurrerar i praktiken bara med `render`. Två samtidiga xelatex-körningar ligger normalt långt under 1 GB, så 1792m är sannolikt generöst — men **siffran är en uppskattning** och mäts i Fas 4 steg 2 innan PR 2 mergas. Postgres i #19 ryms *inte* i marginalen som den ser ut: antingen sänks `render` efter mätningen (t.ex. till 1280m) eller så storleksändras värden till cax21 (8 GB) — det avgörs i #19, inte här. *Agentens bedömning; issuet begär just den här kontrollen.*
+### 11. Monolitiska bundlar skickas som `header_source` med `footer: null`
+**Alternativ:** A: dela upp registrets bundle-format i slots direkt, vs B: en shim som översätter dagens monolitiska `page_template.tex.jinja` till kärnans slot-API.
+**Beslut:** B i PR 2a; A är #64.
+**Motivering:** Registret bär en enda `page_template.tex.jinja` och det finns inga per-slot-filer. Att skicka den som `header_source` med `footer: null` ger samma emission som en delad källa utan footer, alltså oförändrat resultat för befintliga bundlar. Bundlen vinner över ett anropar-skickat `footer`, vilket dokumenteras. Att ändra själva bundle-formatet är ett eget, större arbete.
+*Agentens bedömning, granskad.*
 
-### 7. `render` på ett internt nätverk utan egress
-**Alternativ:** Bara utelämna `ports:`, vs dessutom lägga `render` på ett compose-nätverk med `internal: true`.
-**Beslut:** Internt nätverk.
-**Motivering:** Kostar tre rader i compose-filen och stänger den enda vägen ut för en process som kör anroparstyrd LaTeX: filläsning inom containern kvarstår tills swedev/klartex#51, men innehållet kan inte lämna containern annat än i den PDF `backend` returnerar. `render` behöver inget utåt (fonter och paket är lokala). *Agentens bedömning; bör nämnas i infra/README:s säkerhetsavsnitt.* `read_only: true` + tmpfs för `render` övervägdes men lämnas utanför — fontconfig-cachen gör det osäkert utan test på riktig image.
-
-### 8. Två PR:er, i utrullningsordning
-**Alternativ:** En PR, vs PR 1 (`render` + infra/CI för den) och PR 2 (`backend` proxar + docs).
-**Beslut:** Två.
-**Motivering:** PR 1 är deploybar utan att ändra något utåt, vilket gör att `render-v0.1.0` kan ligga i produktion och verifieras innan `backend` börjar bero på den. PR 2 är den som byter beteende och kan rullas tillbaka till `v0.5.0` med `workflow_dispatch`. PR 2 bär `Closes #46, closes #47`. *Agentens bedömning.*
+### 12. Tre PR:er i denna ordning
+**Beslut:** PR 0 (återställ deploybarhet, nu), PR 2a (kom ikapp kärnan, när releasen finns på PyPI), PR 2b (proxy + slim + konsumera imagen, när imagen finns på GHCR).
+**Motivering:** PR 0 är oberoende av kärnan och löser ett akut problem på `main`. PR 2a behöver bara PyPI och kan därför öppnas så snart kärnreleasen är ute; att skilja den från 2b gör att det publika kontraktsbytet reviewas för sig. PR 2b är den som byter beteende i drift och kan rullas tillbaka till `v0.5.x` med `workflow_dispatch`.
+*Agentens bedömning, granskad.*
 
 ## Verifieringschecklista
 
-- [ ] `pytest` grönt i både `backend/` och `render/` utan xelatex (xelatex-tester skippas, som i CI)
-- [ ] `render`-tester med xelatex lokalt: minimal `_block`-render, bundle med asset renderar med logotyp, `detail.path` på blockfel, semaforen ger 503 + `Retry-After`
-- [ ] `backend`-tester: 403 för anonymt `latex`-block körs *före* proxy-anropet (ingen `render_pdf`-call), upstream 400/503 passerar med status/detail/headers, 422/HTML/ogiltig JSON och transportfel → 502 `render_unavailable` utan värdnamn i meddelandet, in-flight-semaforen ger 503, bundle-payload innehåller template-källa och alla assets, trasig bundle → 400
-- [ ] Kontraktstestet (`test_contract.py`) grönt: `backend`s payload parsas av `render`s modell, `render`s `validation_error` med `path` når klienten oförändrad
-- [ ] Tidsbudgeten sitter: `httpx.Timeout(connect=5, read=130, write=30, pool=5)` i klienten (värsta fall 165 s), `response_header_timeout 180s` i Caddyfile
-- [ ] Maxlasttest lokalt i compose med slutgiltiga tak: en bundle med 10 assets à 5 MB renderas två gånger samtidigt plus ett tredje anrop → 200/200/503, ingen OOM-kill i `docker events`, `backend` under 768m i `docker stats`
-- [ ] `docker build` av `render/` producerar en image med samma storlek som dagens backend-image; `docker build` av `backend/` ger en image under ~200 MB; båda installerar från `pyproject.toml` (ingen beroendelista i `Dockerfile`)
-- [ ] Compose-healthchecken för `backend` använder `python -c "import urllib.request; …"` och tjänsten blir `healthy` i en lokal `docker compose up`
-- [ ] `docker compose config` validerar; `render` saknar `ports`, `volumes` och `environment`; `docker compose exec render env` visar ingen `API_TOKEN`
-- [ ] Från `render`-containern: `curl -m 5 https://example.com` misslyckas (internt nätverk); från `backend` (ingen curl i slim): `python -c "import urllib.request; print(urllib.request.urlopen('http://render:8000/health', timeout=5).read())"` lyckas
-- [ ] Deploy `render-v0.1.0` går grönt (paketet `klartex-se-render` är publikt); deployens interna render mot `render` gav PDF; `/api/render` fungerar oförändrat under tiden monoliten kör
-- [ ] `docker stats` med två samtidiga renders mot `render` i produktion, innan PR 2 mergas — tak justerat i PR 2 om det behövs
-- [ ] `backend`-releasens smoke-test kör hela kedjan `backend → render → xelatex` och jämför `klartex`-versionerna
-- [ ] Deploy `v0.6.0` går grönt; `/api/health` rapporterar 0.6.0 och samma `klartex` som `render`; deployens render-anrop efter omstarten gav PDF; render med inbyggd sidmall, med registrerad bundle och med anonymt `latex`-block ger 200/200/403
-- [ ] Felordning: en deploy av `v0.6.0` mot en `.env` utan `RENDER_VERSION` stannar vid `docker compose pull` med stacken orörd (testas på en kopia av `.env` lokalt eller genom att läsa workflow-logiken — inte mot prod)
-- [ ] `workflow_dispatch` från `v0.5.0` återställer monoliten (rollback-väg dokumenterad, helst testad på servern efter lyckad utrullning)
-- [ ] Docs läser i nu-state: `backend/README.md`, `render/README.md`, `infra/README.md`, `PLAN.md`, `CLAUDE.md`
+### PR 0
+- [ ] `render/` finns inte; ingen fil utanför `agent-docs/` nämner `render-v`, `RENDER_VERSION`, `klartex-se-render` eller `render/`
+- [ ] `docker compose config` validerar med bara `BACKEND_VERSION` satt och `API_TOKEN` osatt — inga andra variabler krävs
+- [ ] `infra/docker-compose.yml` definierar `backend` och `caddy`, inga extra nätverk, `backend` på 2560m / 1.5 CPU
+- [ ] `.github/workflows/deploy.yml` triggas bara av `v[0-9]+.[0-9]+.[0-9]+` och har jobben `build` och `deploy`
+- [ ] `.github/workflows/ci.yml` har ett `test`-jobb utan matris och inget `pins`-jobb
+- [ ] Båda workflow-filerna parsar som YAML
+- [ ] `pytest` grönt i `backend/`
+
+### PR 2a
+- [ ] `pytest` grönt mot den nya kärn-pinnen; inget test refererar `formal`/`clean`/`none`
+- [ ] `page_template` som objekt når kärnan oförändrat; som sträng slår upp bundlen; okänt namn → 400 `unknown_page_template`
+- [ ] Shimmen skickar bundle-källan som `header_source` och sätter `data.page_template.footer = null`; en render med registrerad bundle ger samma PDF som före pin-bumpen
+- [ ] `llms.txt`, `index.html`, `backend/README.md` och `RenderRequest`-exemplen är fria från alias-namnen
+- [ ] `grep -r BUILTIN_PAGE_TEMPLATES backend/` ger inget
+
+### PR 2b
+- [ ] `backend`-tester: 403 för anonymt `latex`-block sker *före* proxy-anropet, upstream 400/503 passerar med status/detail/`Retry-After`, 422/HTML/ogiltig JSON och transportfel → 502 utan värdnamn i meddelandet, in-flight-semaforen ger 503, trasig bundle → 400
+- [ ] Kontraktstestet grönt: `backend`s payload parsas av kärnans modell, kärnans `validation_error` med `path` når klienten oförändrad
+- [ ] Tidsbudgeten sitter: `httpx.Timeout(connect=5, read=130, write=30, pool=5)`, `response_header_timeout 180s` i Caddyfile
+- [ ] `docker build` av `backend/` ger en image under ~200 MB och installerar från `pyproject.toml`
+- [ ] Lokal `docker compose up` med härdningen: `render` blir `healthy`, en riktig render ger PDF, och fontconfig loggar inte "No writable cache directories"
+- [ ] `docker compose exec render env` visar ingen `API_TOKEN`; `curl -m 5 https://example.com` från `render` misslyckas
+- [ ] `KLARTEX_VERSION` i `.env.example` är identisk med `klartex==`-pinnen i `backend/pyproject.toml`, och CI felar om de skiljer sig
+- [ ] Deploy `v0.6.0` går grönt; `/api/health` rapporterar 0.6.0 och samma kärnversion som `render`s `version`; deployens render-anrop efter omstarten gav PDF
+- [ ] `docker stats --no-stream` under en riktig rendering; taken justerade om det behövs
+- [ ] `workflow_dispatch` från `v0.5.x` återställer monoliten och `--remove-orphans` städar render-containern
+- [ ] Docs läser i nu-state: `backend/README.md`, `infra/README.md`, `PLAN.md`, `CLAUDE.md`
