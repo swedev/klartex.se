@@ -139,6 +139,12 @@
       font-size: 13px;
       line-height: 1.7;
     }
+    :not(pre) > code {
+      padding: 0.1em 0.4em;
+      background: #FFFFFF;
+      border: 1px solid var(--linje);
+      border-radius: 3px;
+    }
     pre {
       margin: 1rem 0;
       padding: 1rem;
@@ -213,12 +219,12 @@
 
   <pre><code>pip install klartex</code></pre>
 
-  <p>Kräver Python ≥ 3.12 och XeLaTeX. På macOS <code>brew install --cask mactex</code>; på Debian/Ubuntu:</p>
+  <p>Kräver Python ≥ 3.12 och en TeX-installation med XeLaTeX — flera gigabyte, oavsett plattform. På macOS: <code>brew install --cask mactex</code>. På Debian/Ubuntu:</p>
 
   <pre><code>sudo apt install texlive-xetex texlive-fonts-recommended \
   texlive-latex-extra texlive-latex-recommended texlive-science texlive-plain-generic</code></pre>
 
-  <p>Det är flera gigabyte TeX — värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code>app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code>klartex</code> som bibliotek.</p>
+  <p>Värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code>app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code>klartex</code> som bibliotek.</p>
 
   <h2>Mallar</h2>
 
