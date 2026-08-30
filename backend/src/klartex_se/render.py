@@ -10,10 +10,15 @@ Wraps `klartex.render()`. Supports three modes for the page template:
    (currently "none").
 
 Validation errors and xelatex failures are mapped to HTTP responses with
-structured detail the frontend can present.
+structured detail the frontend can present. Schema violations and block
+validation errors both carry `detail.path` — a
+`["body", 1, "items", 0, "text"]` list addressing the failing node in the
+submitted data — so a client can mark the offending block without parsing
+`detail.message`.
 """
 
 import logging
+import re
 import threading
 from pathlib import Path
 
@@ -46,6 +51,48 @@ MAX_CONCURRENT_RENDERS = 2
 
 _render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
 
+# Block position inside a klartex block-validation message, e.g. `body[1]`
+# or `body[0].items[1][0]` for a block nested in a carrier block.
+_BLOCK_POSITION = r"body(?:\[\d+\]|\.[a-z_]+)+"
+
+# The three message forms `klartex.renderer._validate_blocks` raises as
+# ValueError. Anchored on the full form rather than searching for
+# `at body[...]`: in the unknown-type message the type name is caller
+# supplied and may itself contain that substring. The greedy `'.*'` plus
+# the `. Available: ` anchor therefore selects the last occurrence.
+# A message form the core changes falls through to `None`; the endpoint
+# tests in tests/test_render.py run against the real core and pin this.
+_BLOCK_ERROR_RE = re.compile(
+    rf"^(?:Block at (?P<a>{_BLOCK_POSITION}) is missing 'type'$"
+    rf"|Unknown block type '.*' at (?P<b>{_BLOCK_POSITION})\. Available: "
+    rf"|Invalid '[a-z_]+' block at (?P<c>{_BLOCK_POSITION}): )",
+    re.DOTALL,
+)
+
+
+def _block_error_path(exc: ValueError) -> list[str | int] | None:
+    """Locate the node a klartex block-validation error refers to.
+
+    Returns the position as a `["body", 1, "items", 0, "text"]` list —
+    the same shape `list(ValidationError.absolute_path)` gives for the
+    schema-validation path — or None when the message carries no block
+    position (unknown template, invalid asset_dir).
+    """
+    m = _BLOCK_ERROR_RE.match(str(exc))
+    if m is None:
+        return None
+    where = m.group("a") or m.group("b") or m.group("c")
+    path: list[str | int] = [
+        int(part) if part.isdigit() else part
+        for part in re.findall(r"\d+|[a-z_]+", where)
+    ]
+    # The wrapped jsonschema error, when present, locates the field
+    # inside the block; appending it addresses the failing node itself.
+    cause = exc.__cause__
+    if isinstance(cause, ValidationError):
+        path.extend(cause.absolute_path)
+    return path
+
 
 class RenderRequest(BaseModel):
     template: str = Field(
@@ -70,7 +117,14 @@ class RenderRequest(BaseModel):
     response_class=Response,
     responses={
         200: {"content": {"application/pdf": {}}},
-        400: {"description": "Schema validation or input failure"},
+        400: {
+            "description": (
+                "Schema validation or input failure. `detail.type` is one "
+                "of `validation_error`, `input_error`, "
+                "`unknown_page_template`; `detail.path` locates the "
+                "failing node when one can be identified."
+            )
+        },
         500: {"description": "xelatex failure"},
         503: {"description": "Too many concurrent renders"},
     },
@@ -131,10 +185,11 @@ def render(req: RenderRequest) -> Response:
             },
         ) from e
     except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail={"type": "input_error", "message": str(e)},
-        ) from e
+        detail: dict = {"type": "input_error", "message": str(e)}
+        path = _block_error_path(e)
+        if path is not None:
+            detail["path"] = path
+        raise HTTPException(status_code=400, detail=detail) from e
     except RuntimeError as e:
         log.exception("klartex render failed for template=%s", req.template)
         raise HTTPException(

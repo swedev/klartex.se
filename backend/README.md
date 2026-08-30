@@ -21,6 +21,32 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 
 Multipart-varianten `/api/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
 
+## Felsvar från `/api/render`
+
+Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `type` och `message`, och `path` när felet går att peka ut i den inskickade `data`.
+
+| `detail.type` | Status | När | `path` |
+|---------------|--------|-----|--------|
+| `validation_error` | 400 | Datat bryter mot mallens JSON Schema | Alltid |
+| `input_error` | 400 | Blockvalidering, okänd mall, ogiltig `asset_dir` | När ett block kan pekas ut |
+| `unknown_page_template` | 400 | `page_template` är varken registrerad bundle eller inbyggd | Nej |
+| `overloaded` | 503 | Båda render-platserna upptagna (se nedan) | Nej |
+| `render_error` | 500 | `xelatex` misslyckades | Nej |
+
+`path` är en lista som adresserar den felande noden i `data`, i samma form som jsonschemas `absolute_path`: `["body", 1]` för ett block, `["body", 0, "items", 0, "text"]` för ett fält inne i ett block, `[]` för roten av `data` (t.ex. när `body` saknas). En klient kan alltså markera rätt block utan att tolka `message`, vars formuleringar ägs av klartex-kärnan.
+
+```json
+{
+  "detail": {
+    "type": "input_error",
+    "message": "Invalid 'text' block at body[1]: 'text' is a required property",
+    "path": ["body", 1]
+  }
+}
+```
+
+Ett request som inte ens matchar `RenderRequest` — t.ex. `data` som inte är ett objekt, eller `template` som saknas — avvisas av FastAPI med `422` och pydantics egen form på `detail` (en lista av fel), inte formen ovan.
+
 ## Belastningstak på `/api/render`
 
 En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Endpointen tar därför en av två render-platser innan arbetet börjar. Är båda upptagna svaras `503` direkt — med `Retry-After: 5` och `detail.type = "overloaded"` — i stället för att köa.
