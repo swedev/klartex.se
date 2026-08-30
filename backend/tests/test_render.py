@@ -40,54 +40,104 @@ def test_render_minimal_block_doc():
     assert r.content[:4] == b"%PDF"
 
 
+def post_block_error(body_blocks):
+    """POST a block document expected to fail validation; return the detail."""
+    r = client.post(
+        "/api/render",
+        json={"template": "_block", "data": {"body": body_blocks}},
+    )
+    assert r.status_code == 400, r.text
+    return r.json()["detail"]
+
+
 def test_render_validation_error_returns_structured_400():
-    body = {
-        "template": "_block",
-        "data": {"body": [{"type": "heading"}]},  # missing required `text`
-    }
-    r = client.post("/api/render", json=body)
-    assert r.status_code == 400
-    detail = r.json()["detail"]
-    # klartex.render() wraps both unknown-template and schema-validation
-    # failures as ValueError → input_error. The message carries the detail.
+    """Block validation errors carry both a message and a structured path.
+
+    klartex.render() wraps block validation as ValueError → input_error;
+    render.py recovers the block position from the message and reports it
+    as `detail.path`, in the same list shape the jsonschema path uses.
+    """
+    detail = post_block_error([{"type": "heading"}])  # missing required `text`
     assert detail["type"] == "input_error"
     assert "text" in detail["message"]  # mentions the missing field
+    assert detail["path"] == ["body", 0]
 
 
-def test_render_block_error_message_carries_body_index():
-    """Block validation errors point at the offending block as `body[i]`.
+def test_render_block_error_path_points_at_the_offending_block():
+    detail = post_block_error(
+        [
+            {"type": "heading", "text": "ok"},
+            {"type": "text"},  # missing required `text`
+        ]
+    )
+    assert detail["type"] == "input_error"
+    assert detail["path"] == ["body", 1]
+    assert "body[1]" in detail["message"]  # message stays readable
 
-    klartex wraps block validation as ValueError, so the position reaches
-    clients only inside `detail.message` — there is no structured `path`
-    for this case. The assertion pins that the index survives the
-    passthrough in render.py.
-    """
-    body = {
-        "template": "_block",
-        "data": {
-            "body": [
-                {"type": "heading", "text": "ok"},
-                {"type": "text"},  # missing required `text`
-            ]
-        },
-    }
-    r = client.post("/api/render", json=body)
+
+def test_render_block_error_path_reaches_into_the_block():
+    """A field-level failure inside a block extends the path to the field."""
+    detail = post_block_error([{"type": "heading", "text": 123}])
+    assert detail["path"] == ["body", 0, "text"]
+
+    detail = post_block_error([{"type": "list", "items": [{"text": 5}]}])
+    assert detail["path"] == ["body", 0, "items", 0, "text"]
+
+
+def test_render_block_error_path_covers_nested_blocks():
+    """Blocks nested in a carrier block get their full position."""
+    columns = [[{"type": "text", "text": "a"}], [{"type": "text"}]]
+    detail = post_block_error([{"type": "columns", "items": columns}])
+    assert detail["path"] == ["body", 0, "items", 1, 0]
+
+    columns[1][0] = {"type": "text", "text": 123}  # wrong field type
+    detail = post_block_error([{"type": "columns", "items": columns}])
+    assert detail["path"] == ["body", 0, "items", 1, 0, "text"]
+
+
+def test_render_unknown_block_type_carries_path():
+    detail = post_block_error([{"type": "nope", "text": "x"}])
+    assert detail["type"] == "input_error"
+    assert detail["path"] == ["body", 0]
+
+
+def test_render_unknown_block_type_cannot_forge_a_path():
+    """A block type carrying its own `at body[...]` does not move the path."""
+    forged = "x' at body[9]. Available: y"
+    detail = post_block_error([{"type": forged, "text": "x"}])
+    assert detail["path"] == ["body", 0]
+
+
+def test_render_schema_validation_path_is_unchanged():
+    """Both error paths report the same shape for the same position."""
+    detail = post_block_error([{"text": "x"}])  # block without `type`
+    assert detail["type"] == "validation_error"
+    assert detail["path"] == ["body", 0]
+
+    r = client.post("/api/render", json={"template": "_block", "data": {}})
     assert r.status_code == 400
     detail = r.json()["detail"]
-    assert detail["type"] == "input_error"
-    assert "body[1]" in detail["message"]
-    assert "path" not in detail
+    assert detail["type"] == "validation_error"
+    assert detail["path"] == []
 
-    body["data"]["body"] = [{"type": "text"}]
-    r = client.post("/api/render", json=body)
-    assert r.status_code == 400
-    assert "body[0]" in r.json()["detail"]["message"]
+
+def test_block_error_path_handles_unreachable_missing_type_form():
+    """The `Block at ... is missing 'type'` form the API cannot reach today."""
+    exc = ValueError("Block at body[2].content[0] is missing 'type'")
+    assert render_module._block_error_path(exc) == ["body", 2, "content", 0]
+
+
+def test_block_error_path_returns_none_for_other_errors():
+    assert render_module._block_error_path(ValueError("Unknown template")) is None
 
 
 def test_render_unknown_template_returns_400():
+    """An error with no block position carries no `path`."""
     r = client.post("/api/render", json={"template": "nope", "data": {}})
     assert r.status_code == 400
-    assert r.json()["detail"]["type"] == "input_error"
+    detail = r.json()["detail"]
+    assert detail["type"] == "input_error"
+    assert "path" not in detail
 
 
 def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch):
