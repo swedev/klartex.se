@@ -32,10 +32,10 @@
   | Fel djupt inne i block | `Invalid 'list' block at body[0]: 5 is not of type 'string'` | `ValidationError`, `absolute_path = ['items', 0, 'text']` |
   | Nästlat block (`columns`) | `Invalid 'text' block at body[0].items[1][0]: 'text' is a required property` | `ValidationError`, `absolute_path = []` |
   | Okänd blocktyp | `Unknown block type 'nope' at body[0]. Available: agenda, …` | `None` |
-  | Block utan `type` | `Block at body[i] is missing 'type'` — i praktiken onåbart via API:t: toppnivåschemat kräver `type` (ger `validation_error` med `path = ['body', i]`) och nästlade carriers avvisar okända fält via förälderns schema | `None` |
+  | Tomt `type` i toppnivåblock | `Block at body[i] is missing 'type'` — nås via `{"type": "", …}`: toppnivåschemat kräver bara att `type` är en sträng, och `_validate_blocks()` läser tomma strängen som saknad typ | `None` |
   | Okänd mall, ogiltig `asset_dir` | Ingen blockposition i strängen | — |
 
-  Observera att `Block at body[1] is missing 'type'` i dag når klienten som `validation_error` med `path = ["body", 1]` — den vägen är redan strukturerad och rörs inte. Detsamma gäller saknad `body` (`validation_error`, `path = []` = roten av `data`) och `body` som inte är en array (`path = ["body"]`): toppnivåschemat fångar dem innan `_validate_blocks()` körs. Kärnans `ValueError("Block engine data must include a 'body' array")` i `block_engine.py` är därmed onåbar via API:t.
+  Observera att ett block som saknar `type`-nyckeln helt når klienten som `validation_error` med `path = ["body", 1]` — den vägen är redan strukturerad och rörs inte; det är enbart tomma strängen som tar sig förbi toppnivåschemat till `_validate_blocks()`. Detsamma gäller saknad `body` (`validation_error`, `path = []` = roten av `data`) och `body` som inte är en array (`path = ["body"]`): toppnivåschemat fångar dem innan `_validate_blocks()` körs. Kärnans `ValueError("Block engine data must include a 'body' array")` i `block_engine.py` är därmed onåbar via API:t.
 
 ## Angreppssätt
 
@@ -92,7 +92,7 @@ def _block_error_path(exc: ValueError) -> list[str | int] | None:
    - okänd mall (`template: "nope"`) → `input_error` **utan** `path`-nyckel
    - `validation_error`-fallet (`{"body": [{"text": "x"}]}` utan `type`) → oförändrat `path == ["body", 0]` — bevisar att de två vägarna ger samma form
    - Filer att ändra: `backend/tests/test_render.py`
-3. Enhetstester direkt på `_block_error_path()` för det onåbara formatet `Block at body[2].content[0] is missing 'type'` → `["body", 2, "content", 0]`, samt för en `ValueError` utan match → `None`
+3. Endpoint-test för `Block at body[i] is missing 'type'`-formen via `{"type": ""}` → `["body", 1]`, samt enhetstest för en `ValueError` utan match → `None`
    - Filer att ändra: `backend/tests/test_render.py`
 
 ### Fas 3: Dokumentation

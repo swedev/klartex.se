@@ -121,10 +121,19 @@ def test_render_schema_validation_path_is_unchanged():
     assert detail["path"] == []
 
 
-def test_block_error_path_handles_unreachable_missing_type_form():
-    """The `Block at ... is missing 'type'` form the API cannot reach today."""
-    exc = ValueError("Block at body[2].content[0] is missing 'type'")
-    assert render_module._block_error_path(exc) == ["body", 2, "content", 0]
+def test_render_block_with_empty_type_carries_path():
+    """An empty `type` satisfies the top-level schema but not the core.
+
+    It reaches `_validate_blocks`, which reports it as
+    `Block at body[i] is missing 'type'` — the third message form the
+    path extraction has to recognise.
+    """
+    detail = post_block_error(
+        [{"type": "heading", "text": "ok"}, {"type": "", "text": "x"}]
+    )
+    assert detail["type"] == "input_error"
+    assert detail["path"] == ["body", 1]
+    assert "body[1]" in detail["message"]
 
 
 def test_block_error_path_returns_none_for_other_errors():
