@@ -1,14 +1,8 @@
 name: Release
 
-# One tag releases one service. `v*` builds and rolls out the backend (the
-# app: policy, discovery, the page-template registry, /api); `render-v*`
-# does the same for the render service (the LaTeX compiler). The two carry
-# independent version series so a product release never has to move the
-# ~9 GB TeX base through CI again.
-#
-# Either tag builds the image, smoke-tests it, publishes it, and rolls it
-# out to the production server — in that order, in one run. Nothing is built
-# on a push to main: main takes ordinary work without side effects, and an
+# A v* tag builds the image, smoke-tests it, publishes it, and rolls it out
+# to the production server — in that order, in one run. Nothing is built on
+# a push to main: main takes ordinary work without side effects, and an
 # image exists only because a release was cut.
 #
 # workflow_dispatch from a tag re-runs that release (rollback). The build is
@@ -23,13 +17,10 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'render-v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 # Never interleave two deploys on the server. Queued runs wait rather than
 # cancel: a v0.2.4 push right after v0.2.3 should deploy both, in order.
-# The two version series share the group — a render deploy and a backend
-# deploy must not touch the server's .env at the same time.
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -38,72 +29,18 @@ permissions:
   contents: read
 
 jobs:
-  resolve:
-    name: Resolve target from tag
-    # Tag guard: the dispatch UI preselects the default branch, and an
-    # untagged build must never reach production.
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      service: ${{ steps.target.outputs.service }}
-      version: ${{ steps.target.outputs.version }}
-      image: ${{ steps.target.outputs.image }}
-      env_var: ${{ steps.target.outputs.env_var }}
-    steps:
-      - uses: actions/checkout@v4
-
-      # The tag names both the service and its version, and the version has
-      # to match the pyproject.toml of that service — a tag can point at any
-      # commit, including one whose version was never bumped.
-      - name: Derive service and version
-        id: target
-        run: |
-          case "$GITHUB_REF_NAME" in
-            render-v*)
-              service=render
-              version="${GITHUB_REF_NAME#render-v}"
-              image=ghcr.io/swedev/klartex-se-render
-              env_var=RENDER_VERSION
-              ;;
-            v*)
-              service=backend
-              version="${GITHUB_REF_NAME#v}"
-              image=ghcr.io/swedev/klartex-se-backend
-              env_var=BACKEND_VERSION
-              ;;
-            *)
-              echo "tag $GITHUB_REF_NAME names no service (expected v* or render-v*)" >&2
-              exit 1
-              ;;
-          esac
-
-          declared=$(python3 -c "import sys, tomllib; print(tomllib.load(open(sys.argv[1],'rb'))['project']['version'])" "$service/pyproject.toml")
-          if [[ "$version" != "$declared" ]]; then
-            echo "tag $GITHUB_REF_NAME does not match $service/pyproject.toml version $declared" >&2
-            exit 1
-          fi
-
-          {
-            echo "service=$service"
-            echo "version=$version"
-            echo "image=$image"
-            echo "env_var=$env_var"
-          } >> "$GITHUB_OUTPUT"
-          echo "Releasing $service $version as $image:$version"
-
   build:
     name: Build and publish image
-    needs: resolve
     # Publishing to GHCR needs more than the workflow's read-only default.
     # Scoped to this job so the deploy job keeps read-only credentials.
     permissions:
       contents: read
       packages: write
+    # Tag guard: the dispatch UI preselects the default branch, and an
+    # untagged build must never reach production.
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      SERVICE: ${{ needs.resolve.outputs.service }}
     steps:
       - uses: actions/checkout@v4
 
@@ -112,13 +49,25 @@ jobs:
           python-version: '3.12'
 
       # CI already ran these on the pull request. Running them again here
-      # binds the tested tree to the published image.
+      # binds the tested tree to the published image: a tag can point at any
+      # commit, including one that never went through a PR.
       - name: Run tests
-        working-directory: ./${{ needs.resolve.outputs.service }}
+        working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
           pytest -q
+
+      - name: Resolve version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pyproject=$(python3 -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          if [[ "$version" != "$pyproject" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match backend/pyproject.toml version $pyproject" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -134,36 +83,28 @@ jobs:
       # broken PATH — failures a successful `docker build` does not reveal.
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ needs.resolve.outputs.service }}
+          context: ./backend
           platforms: linux/amd64
           load: true
           tags: smoke-test:amd64
 
       - name: Smoke-test (render a minimal block-engine PDF)
         run: |
-          if [ "$SERVICE" = render ]; then
-            health=/health
-            render=/render
-          else
-            health=/api/health
-            render=/api/render
-          fi
-
           docker run -d --name smoke -p 18000:8000 smoke-test:amd64
           for i in $(seq 1 30); do
-            if curl -fsS "http://localhost:18000$health" >/dev/null 2>&1; then
-              echo "✓ $health up after ${i}s"; break
+            if curl -fsS http://localhost:18000/api/health >/dev/null 2>&1; then
+              echo "✓ /api/health up after ${i}s"; break
             fi
             sleep 1
           done
-          curl -fsS "http://localhost:18000$health"
+          curl -fsS http://localhost:18000/api/health
           code=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
-            -X POST "http://localhost:18000$render" \
+            -X POST http://localhost:18000/api/render \
             -H "Content-Type: application/json" \
             -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
           echo "render HTTP $code"
           if [ "$code" != "200" ]; then
-            echo "--- $SERVICE logs ---"; docker logs smoke
+            echo "--- backend logs ---"; docker logs smoke
             echo "--- response ---"; cat /tmp/out.pdf
             exit 1
           fi
@@ -176,20 +117,35 @@ jobs:
       # Only after the smoke test passes does anything reach the registry.
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ needs.resolve.outputs.service }}
+          context: ./backend
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ needs.resolve.outputs.image }}:${{ needs.resolve.outputs.version }}
-            ${{ needs.resolve.outputs.image }}:latest
+            ghcr.io/swedev/klartex-se-backend:${{ steps.version.outputs.version }}
+            ghcr.io/swedev/klartex-se-backend:latest
 
   deploy:
     name: Deploy to production
-    needs: [resolve, build]
+    needs: build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      # Re-resolved here because jobs do not share step outputs implicitly.
+      # The build job already failed the run if the tag and pyproject.toml
+      # disagreed, so this cannot diverge from what was published.
+      - name: Resolve version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pyproject=$(python3 -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          if [[ "$version" != "$pyproject" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match backend/pyproject.toml version $pyproject" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # The host key is pinned via the SSH_KNOWN_HOSTS secret rather than
       # trusting whatever ssh-keyscan returns at deploy time. To rotate
@@ -212,10 +168,9 @@ jobs:
 
       # infra/.env is deliberately excluded: it is gitignored, so it does not
       # exist in this checkout, and --delete would otherwise remove the
-      # server's copy and take the stack down. The version variables are
-      # written on the server instead, in the deploy step below. rsync
-      # protects excluded paths from --delete, so the server's .env survives
-      # untouched.
+      # server's copy and take the stack down. BACKEND_VERSION is written on
+      # the server instead, in the deploy step below. rsync protects excluded
+      # paths from --delete, so the server's .env survives untouched.
       - name: Sync infra and landing page
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
@@ -250,12 +205,10 @@ jobs:
       - name: Build Caddy, preflight, and restart
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
-          SERVICE: ${{ needs.resolve.outputs.service }}
-          VERSION: ${{ needs.resolve.outputs.version }}
-          ENV_VAR: ${{ needs.resolve.outputs.env_var }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           ssh -i "$HOME/.ssh/deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "klartex@$HOST" "export SERVICE='$SERVICE' VERSION='$VERSION' ENV_VAR='$ENV_VAR' && bash -se" <<'REMOTE'
+            "klartex@$HOST" "export VERSION='$VERSION' && bash -se" <<'REMOTE'
           set -Eeuo pipefail
           cd /home/klartex/klartex
 
@@ -294,19 +247,15 @@ jobs:
 
           # Record the version in .env so the systemd unit's `docker compose
           # up -d` resolves the deployed image rather than the previous one.
-          # Only this release's variable is touched; the other service keeps
-          # whatever version it is running.
-          sed -i "/^${ENV_VAR}=/d" .env
-          printf '%s=%s\n' "$ENV_VAR" "$VERSION" >> .env
+          sed -i '/^BACKEND_VERSION=/d' .env
+          printf 'BACKEND_VERSION=%s\n' "$VERSION" >> .env
 
           # The caddy image is built here, not pulled: `docker compose pull`
           # alone would try to fetch klartex-se-caddy:local from a registry.
-          # A compose file referencing a version the server's .env does not
-          # carry fails here — before anything is stopped.
           if docker compose pull --help | grep -q -- --ignore-buildable; then
               docker compose pull --ignore-buildable
           else
-              docker compose pull backend render
+              docker compose pull backend
           fi
 
           # The systemd unit runs `docker compose up -d`, which does not
@@ -327,58 +276,27 @@ jobs:
           sleep 5
           docker compose ps
           running="$(docker compose ps --services --filter status=running)"
-          for svc in backend render caddy; do
+          for svc in backend caddy; do
               grep -qx "$svc" <<<"$running" || {
                   echo "service $svc is not running after restart"
                   false
               }
           done
 
-          # The version the released service actually reports has to match
-          # what was deployed — a stale container would otherwise pass the
-          # checks above. render publishes no port, so it is asked from
-          # inside its own container.
-          health_of() {
-              if [[ "$1" == render ]]; then
-                  docker compose exec -T render curl -fsS http://localhost:8000/health
-              else
-                  curl -fsS http://127.0.0.1:8000/api/health
-              fi
-          }
-          version_field() { sed -n 's/.*"version":"\([^"]*\)".*/\1/p'; }
-
-          reported=""
+          # The version the API actually reports has to match what was
+          # deployed — a stale container would otherwise pass the checks above.
           for i in 1 2 3 4 5 6; do
-              reported="$(health_of "$SERVICE" | version_field || true)"
-              [[ "$reported" == "$VERSION" ]] && break
+              reported="$(curl -fsS http://127.0.0.1:8000/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+              if [[ "$reported" == "$VERSION" ]]; then
+                  echo "health check: OK ($reported)"
+                  trap - ERR
+                  exit 0
+              fi
               sleep 5
           done
-          if [[ "$reported" != "$VERSION" ]]; then
-              echo "health check FAILED — $SERVICE reports '${reported:-nothing}', expected '$VERSION'" >&2
-              false
-          fi
-          echo "health check: OK ($SERVICE $reported)"
-
-          # A live render, still under the restore trap: a healthy container
-          # that cannot compile is what this catches.
-          docker compose exec -T render curl -fsS -X POST http://localhost:8000/render \
-              -H 'Content-Type: application/json' \
-              -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"deploy check"}]}}' \
-              > /tmp/deploy-render-check.pdf
-          head -c 4 /tmp/deploy-render-check.pdf | grep -q '%PDF' || {
-              echo "render did not return a PDF"; head -c 200 /tmp/deploy-render-check.pdf; false
-          }
-          echo "render check: OK ($(stat -c%s /tmp/deploy-render-check.pdf) bytes of PDF)"
-          rm -f /tmp/deploy-render-check.pdf
-
-          # Both cores, printed side by side. They have to be the same
-          # version: discovery schemas come from one, the renderer from the
-          # other.
-          echo "backend health: $(health_of backend)"
-          echo "render  health: $(health_of render)"
-
-          trap - ERR
+          echo "health check FAILED — /api/health reports '${reported:-nothing}', expected '$VERSION'" >&2
+          false
           REMOTE
 
       - name: Report version
-        run: echo "Deployed ${{ github.ref_name }} (${{ needs.resolve.outputs.service }} ${{ needs.resolve.outputs.version }}) to production" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Deployed ${{ github.ref_name }} to production" >> "$GITHUB_STEP_SUMMARY"
