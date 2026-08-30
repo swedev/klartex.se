@@ -6,13 +6,13 @@
 
 ## Genomförda steg
 
-- [x] **Fas 0 (PR 0): deploybarheten återställd.** Trädet är identiskt med `v0.5.0` utanför `agent-docs/`.
+- [x] **Fas 0 (PR 0): deploybarheten återställd.** Stacken är tillbaka i `v0.5.0`:s form — `backend` och `caddy`, inga render-referenser.
   - `render/` borttagen i sin helhet — render-tjänsten byggs av `swedev/klartex`, inte här.
   - `infra/docker-compose.yml`: tjänsten `render` och det interna nätverket `render` borta; `backend` på ett enda nätverk med taken 2560m / 1.5 CPU. `docker compose config` validerar med bara `BACKEND_VERSION` satt och `API_TOKEN` osatt.
   - `.github/workflows/deploy.yml`: `render-v*`-triggern och `resolve`-jobbet borta; ett `v*`-flöde med jobben `build` och `deploy`.
   - `.github/workflows/ci.yml`: matrisen och `pins`-jobbet borta; ett `test`-jobb mot `backend/`.
   - `infra/.env.example`: `RENDER_VERSION` borta.
-  - `infra/README.md`: alla render-referenser borta (tabellrader, "Uppgradera", GHCR-avsnittet, säkerhet, felsökning).
+  - `infra/README.md`: alla render-referenser borta (tabellrader, "Uppgradera", GHCR-avsnittet, säkerhet, felsökning); felsökningens logg-kommando namnger tjänsten `backend`.
   - Verifierat: `pytest -q -rs` i `backend/` (74 gröna), `docker compose config` med enbart `BACKEND_VERSION`, båda workflow-filerna parsar som YAML, och ingen fil utanför `agent-docs/` nämner `render-v`, `RENDER_VERSION`, `klartex-se-render` eller `render/`.
 
 ## Pågående arbete

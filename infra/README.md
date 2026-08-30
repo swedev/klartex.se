@@ -93,7 +93,7 @@ ssh klartex@<ip> "cloud-init status"
 ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml ps"
 
 # Loggar
-ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml logs --tail=200 klartex"
+ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml logs --tail=200 backend"
 ssh klartex@<ip> "docker compose -f ~/klartex/docker-compose.yml logs --tail=200 caddy"
 
 # Caddy reload utan restart

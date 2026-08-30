@@ -100,7 +100,7 @@ Rollback till `v0.5.x` fungerar oförändrat: den taggens compose-fil saknar `re
 
 ### Fas 0: Återställ deploybarheten (PR 0)
 
-`main` bär en compose-fil som kräver `${RENDER_VERSION:?}` och en deploy som kontrollerar att en `render`-tjänst kör. Ingen av delarna finns på servern, så varje `v0.5.x`-tagg från `main` stannar vid `docker compose pull` — restore-trappen återställer, stacken förblir orörd och deployen blir röd. `pins`-jobbet i CI felar dessutom så snart backendens kärn-pin bumpas. PR 0 tar bort båda hindren och lämnar trädet exakt i `v0.5.0`:s form.
+`main` bär en compose-fil som kräver `${RENDER_VERSION:?}` och en deploy som kontrollerar att en `render`-tjänst kör. Ingen av delarna finns på servern, så varje `v0.5.x`-tagg från `main` stannar vid `docker compose pull` — restore-trappen återställer, stacken förblir orörd och deployen blir röd. `pins`-jobbet i CI felar dessutom så snart backendens kärn-pin bumpas. PR 0 tar bort båda hindren och återställer stacken till `v0.5.0`:s form.
 
 1. Ta bort `render/` i sin helhet — kärnan äger render-tjänsten, klartex.se har ingen källa för den.
 2. `infra/docker-compose.yml`: ta bort tjänsten `render` och det interna nätverket `render`; `backend` tillbaka på ett enda nätverk med taken 2560m / 1.5 CPU.
