@@ -81,7 +81,7 @@ Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka
 
 `POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
 
-Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`), och backend-containern kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml` — anpassade till en cax11 (2 vCPU, 4 GB) så att OS och Caddy behåller marginal när backend är mättad.
+Backend har dessutom ett tak på två samtidiga renders (503 + `Retry-After`). Båda containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB), och varför taken är satta som de är medan bara den ena tjänsten kompilerar, står i kommentaren överst i den filen.
 
 ## Tillgång till GHCR-imagerna
 
@@ -101,7 +101,8 @@ Om en image behöver vara private framöver: skapa en GHCR-PAT med `read:package
 - `unattended-upgrades` är på för säkerhetsuppdateringar.
 - `fail2ban` rebans SSH brute-force.
 - `backend` lyssnar på loopback — bara Caddy kan nå den.
-- `render` publicerar ingen port alls och ligger på ett compose-nätverk med `internal: true`: den är nåbar enbart från `backend`, och har själv ingen väg ut till internet. Den har varken `environment` eller volymer, så processen som kör anroparstyrd LaTeX delar inte miljö med `API_TOKEN` eller med sidmallsregistret.
+- `render` publicerar ingen port alls och ligger på ett compose-nätverk med `internal: true`: den är nåbar enbart från `backend`, och har själv ingen väg ut till internet. Den har varken `environment` eller volymer, så den kompilerar med både `API_TOKEN` och sidmallsregistret utom räckhåll.
+- `backend` kompilerar fortfarande i egen process, med `API_TOKEN` i miljön och `./page-templates` monterad. Den isoleringen `render` ger blir verklig för anroparstyrd LaTeX först när `backend` proxar dit i stället.
 
 ## Felsökning
 

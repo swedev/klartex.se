@@ -1,6 +1,6 @@
 # render/
 
-Intern render-tjänst: en tillståndslös HTTP-inpackning av `klartex.render()`. Det är den enda processen i stacken som kör `xelatex`, och den enda imagen som bär TeX Live.
+Intern render-tjänst: en tillståndslös HTTP-inpackning av `klartex.render()`. Den kör `xelatex` och byggs därför på TeX Live-basimagen `ghcr.io/swedev/klartex-base` — kompileringen ska bo i en egen container, skild från produktens hemligheter och tillstånd.
 
 Tjänsten känner inte till konton, tokens, sidmallsregistret eller något annat i produkten. Den tar ett dokument och det den behöver för att kompilera det, och lämnar tillbaka en PDF. Hela poängen är att den processen inte delar miljö med instansens hemligheter: `render` har ingen `environment`, inga volymer, ingen publicerad port och ligger på ett compose-nätverk med `internal: true`.
 
@@ -52,13 +52,13 @@ Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `
 | `render_error` | 500 | `xelatex` misslyckades | Nej |
 | `overloaded` | 503 | Båda render-platserna upptagna; `Retry-After: 5` | Nej |
 
-Formerna är desamma som `/api/render` svarar med utåt, och kontraktet är att `backend` skickar status, `detail` och `Retry-After` vidare oförändrade. Felmeddelandenas formuleringar ägs alltså här — nära den kärna vars meddelanden de tolkar.
+Formerna är desamma som `/api/render` svarar med utåt. Kontraktet mot anroparen är att status, `detail` och `Retry-After` skickas vidare oförändrade, så felmeddelandenas formuleringar ägs här — nära den kärna vars meddelanden de tolkar.
 
 ## Belastningstak
 
 En render startar `xelatex` två gånger med 60 s timeout per körning. Endpointen tar därför en av två render-platser innan arbetet börjar; är båda upptagna svaras `503` direkt i stället för att köa.
 
-Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. `backend` sätter ett in-flight-tak av samma storlek framför sin proxning, så ett tredje samtidigt anrop stoppas redan där.
+Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Anroparen förväntas hålla ett eget in-flight-tak av samma storlek, så att ett tredje samtidigt anrop stoppas redan innan det når hit.
 
 ## Lokal utveckling
 
