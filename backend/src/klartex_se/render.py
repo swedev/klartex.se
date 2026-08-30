@@ -15,6 +15,10 @@ validation errors both carry `detail.path` — a
 `["body", 1, "items", 0, "text"]` list addressing the failing node in the
 submitted data — so a client can mark the offending block without parsing
 `detail.message`.
+
+The endpoint is tier-aware. Anonymous callers render every block except
+`latex`, which passes raw LaTeX to the compiler and answers `403
+token_required`; a valid API token unlocks the full block surface.
 """
 
 import logging
@@ -22,13 +26,14 @@ import re
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from jsonschema import ValidationError
 from pydantic import BaseModel, Field
 
 from klartex import render as klartex_render
 
+from klartex_se.auth import TOKEN_HOWTO, Tier, render_tier
 from klartex_se.page_templates import (
     PageTemplateNotFound,
     TEMPLATE_FILENAME,
@@ -94,6 +99,32 @@ def _block_error_path(exc: ValueError) -> list[str | int] | None:
     return path
 
 
+def find_latex_block(body: object) -> list[str | int] | None:
+    """Locate the first `latex` block anywhere under a `_block` body.
+
+    Walks dicts and lists in document order and returns the path to the
+    first dict carrying `"type": "latex"` — a `["body", 0, "items", 1, 0]`
+    list, the same shape `detail.path` already uses — or None when there
+    is none. The walk is generic rather than schema-aware, so a `latex`
+    block is found inside any carrier block (`list`, `columns`, `clause`,
+    and any carrier added later). Iterative, since deeply nested request
+    JSON must not be able to raise RecursionError.
+    """
+    stack: list[tuple[object, list[str | int]]] = [(body, ["body"])]
+    while stack:
+        node, path = stack.pop()
+        if isinstance(node, dict):
+            if node.get("type") == "latex":
+                return path
+            children = [(value, path + [key]) for key, value in node.items()]
+        elif isinstance(node, list):
+            children = [(value, path + [i]) for i, value in enumerate(node)]
+        else:
+            continue
+        stack.extend(reversed(children))
+    return None
+
+
 class RenderRequest(BaseModel):
     template: str = Field(
         ...,
@@ -125,12 +156,48 @@ class RenderRequest(BaseModel):
                 "failing node when one can be identified."
             )
         },
+        401: {
+            "description": (
+                "An Authorization header was presented but the token is "
+                "invalid. `detail.type` is `invalid_token`."
+            )
+        },
+        403: {
+            "description": (
+                "The request uses a block the anonymous tier may not "
+                "render. `detail.type` is `token_required`, "
+                "`detail.block_type` names the block and `detail.path` "
+                "locates it."
+            )
+        },
         500: {"description": "xelatex failure"},
-        503: {"description": "Too many concurrent renders"},
+        503: {
+            "description": (
+                "Either too many concurrent renders (`detail.type` is "
+                "`overloaded`) or a token was presented to an instance "
+                "with none configured (`token_not_configured`)."
+            )
+        },
     },
 )
-def render(req: RenderRequest) -> Response:
+def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
     """Render a template + data combination to a PDF."""
+    if tier is Tier.ANONYMOUS and req.template == "_block":
+        latex_path = find_latex_block(req.data.get("body"))
+        if latex_path is not None:
+            raise HTTPException(
+                403,
+                detail={
+                    "type": "token_required",
+                    "block_type": "latex",
+                    "path": latex_path,
+                    "message": (
+                        "The 'latex' block passes raw LaTeX to the compiler "
+                        f"and requires an API token. {TOKEN_HOWTO}"
+                    ),
+                },
+            )
+
     page_template_source: str | None = None
     asset_dir: Path | None = None
     data = req.data

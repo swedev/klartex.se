@@ -4,23 +4,24 @@ Storage tests don't need xelatex. Render-via-name tests live in test_render.py.
 """
 
 import base64
-import os
 
 import pytest
 from fastapi.testclient import TestClient
 
+from klartex_se.auth import TOKEN_HOWTO
 from klartex_se.main import app
 from klartex_se import page_templates as pt
 
-ADMIN_TOKEN = "test-token-do-not-use-in-prod"
-AUTH = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+API_TOKEN = "test-token-do-not-use-in-prod"
+AUTH = {"Authorization": f"Bearer {API_TOKEN}"}
+WRONG_AUTH = {"Authorization": "Bearer nope"}
 
 
 @pytest.fixture(autouse=True)
 def isolated_registry(tmp_path, monkeypatch):
-    """Each test gets a fresh registry dir + admin token."""
+    """Each test gets a fresh registry dir + API token."""
     monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
-    monkeypatch.setenv("ADMIN_TOKEN", ADMIN_TOKEN)
+    monkeypatch.setenv("API_TOKEN", API_TOKEN)
     yield
 
 
@@ -120,15 +121,52 @@ def test_list_empty(client):
     assert r.json() == []
 
 
-def test_create_requires_admin(client):
+def test_create_requires_api_token(client):
     body = {"name": "vkf", "template": b64("x"), "assets": {}}
     # No auth header.
     r = client.post("/api/page-templates", json=body)
     assert r.status_code == 401
+    detail = r.json()["detail"]
+    assert detail["type"] == "token_required"
+    assert TOKEN_HOWTO in detail["message"]
+    assert r.headers["WWW-Authenticate"] == "Bearer"
     # With auth.
     r = client.post("/api/page-templates", json=body, headers=AUTH)
     assert r.status_code == 201
     assert r.json()["name"] == "vkf"
+
+
+def test_create_with_wrong_token_returns_401(client):
+    r = client.post(
+        "/api/page-templates",
+        json={"name": "vkf", "template": b64("x"), "assets": {}},
+        headers=WRONG_AUTH,
+    )
+    assert r.status_code == 401
+    detail = r.json()["detail"]
+    assert detail["type"] == "invalid_token"
+    assert TOKEN_HOWTO in detail["message"]
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_delete_requires_api_token(client):
+    r = client.post(
+        "/api/page-templates",
+        json={"name": "doomed", "template": b64("x"), "assets": {}},
+        headers=AUTH,
+    )
+    assert r.status_code == 201
+
+    r = client.delete("/api/page-templates/doomed")
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "token_required"
+
+    r = client.delete("/api/page-templates/doomed", headers=WRONG_AUTH)
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "invalid_token"
+
+    r = client.delete("/api/page-templates/doomed", headers=AUTH)
+    assert r.status_code == 204
 
 
 def test_create_then_get_then_delete(client):
@@ -166,14 +204,33 @@ def test_create_conflict_then_overwrite(client):
     assert r.status_code == 201
 
 
-def test_unconfigured_admin_returns_503(client, monkeypatch):
-    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+@pytest.mark.parametrize("unset", [True, False])
+def test_unconfigured_token_returns_503(client, monkeypatch, unset):
+    """A missing and an empty API_TOKEN both mean "not configured"."""
+    if unset:
+        monkeypatch.delenv("API_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("API_TOKEN", "")
+
     r = client.post(
         "/api/page-templates",
         json={"name": "x", "template": b64("y"), "assets": {}},
         headers=AUTH,
     )
     assert r.status_code == 503
+    assert r.json()["detail"]["type"] == "token_not_configured"
+
+    # Reads stay open on an instance without a token.
+    assert client.get("/api/page-templates").status_code == 200
+    assert client.get("/api/templates").status_code == 200
+
+
+def test_openapi_documents_write_auth_responses(client):
+    paths = client.get("/api/openapi.json").json()["paths"]
+    assert {"401", "503"} <= set(paths["/api/page-templates"]["post"]["responses"])
+    assert {"401", "503"} <= set(
+        paths["/api/page-templates/{name}"]["delete"]["responses"]
+    )
 
 
 def test_invalid_base64_returns_400(client):
