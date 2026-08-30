@@ -1,6 +1,6 @@
 name: CI
 
-# Tests on every pull request and on main. Deliberately Docker-free: the
+# Tests on every pull request and on main. Deliberately Docker-free: an
 # image is built only when a release is tagged, so this is what stands
 # between a change and main.
 
@@ -14,9 +14,13 @@ permissions:
 
 jobs:
   test:
-    name: Backend tests
+    name: ${{ matrix.service }} tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, render]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +33,37 @@ jobs:
       # concurrency cap — runs. The full render path is covered by the smoke
       # test in the release workflow.
       - name: Run tests
-        working-directory: ./backend
+        working-directory: ./${{ matrix.service }}
         run: |
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
           pytest -q -rs
+
+  pins:
+    name: klartex pin matches across services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # Discovery schemas come from the core installed in backend, the
+      # renderer from the core installed in render. They have to be the same
+      # core, so the pin is compared rather than trusted.
+      - name: Compare klartex pins
+        run: |
+          python3 - <<'PY'
+          import re, sys, tomllib
+
+          pins = {}
+          for service in ("backend", "render"):
+              with open(f"{service}/pyproject.toml", "rb") as fh:
+                  deps = tomllib.load(fh)["project"]["dependencies"]
+              found = [d for d in deps if re.match(r"^klartex\s*==", d)]
+              if len(found) != 1:
+                  sys.exit(f"{service}/pyproject.toml: expected one klartex== pin, found {found}")
+              pins[service] = found[0].replace(" ", "")
+
+          if len(set(pins.values())) != 1:
+              sys.exit(f"klartex pins differ: {pins}")
+          print(f"klartex pin: {pins['backend']}")
+          PY

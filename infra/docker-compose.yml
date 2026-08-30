@@ -1,20 +1,53 @@
 # klartex.se production stack.
 # Deployed to ~klartex/klartex/docker-compose.yml on the Hetzner server.
-# Pinned version comes from .env (BACKEND_VERSION); never use :latest in prod.
+# Pinned versions come from .env (BACKEND_VERSION, RENDER_VERSION); never
+# use :latest in prod. The two services carry independent version series
+# and are released by separate tags — see infra/README.md.
+#
+# Resource budget: the host is a cax11 (2 vCPU, 4 GB), and every cap below
+# is a ceiling rather than a reservation. The memory ceilings sum to 3328m,
+# which leaves ~0.7 GB for the OS, Docker and Caddy if both services
+# saturate at once, and the two 1.5 CPU quotas over-subscribe the 2 vCPU.
+# Both are deliberate for as long as only one of the two actually
+# compiles: render is deployed beside a backend that still compiles
+# in-process, so its own ceiling is headroom waiting for the proxy. The
+# caps settle at render 1792m / 1.5 CPU and backend 768m / 0.5 CPU once
+# backend only proxies, which puts the sum back at today's 2560m.
+# memswap_limit == mem_limit disables swap throughout: a render that blows
+# its cap is OOM-killed rather than thrashing the disk.
 
 services:
+  # Compiles LaTeX, and nothing else. No secrets in its environment, no
+  # volumes, no published port, and an internal-only network: a process
+  # running caller-supplied LaTeX has nowhere to send anything it reads.
+  render:
+    image: ghcr.io/swedev/klartex-se-render:${RENDER_VERSION:?set RENDER_VERSION in infra/.env — deploy render-v* before the backend that proxies to it}
+    container_name: klartex-se-render
+    restart: unless-stopped
+    cpus: "1.5"
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    pids_limit: 256
+    networks:
+      - render
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   backend:
     image: ghcr.io/swedev/klartex-se-backend:${BACKEND_VERSION}
     container_name: klartex-se-backend
     restart: unless-stopped
-    # Resource caps for the render workload. The host is a cax11
-    # (2 vCPU, 4 GB), so OS + Caddy keep ~1.5 GB and half a core.
-    # memswap_limit == mem_limit disables swap: a render that blows the
-    # cap is OOM-killed rather than thrashing the disk.
     cpus: "1.5"
-    mem_limit: 2560m
-    memswap_limit: 2560m
+    mem_limit: 1792m
+    memswap_limit: 1792m
     pids_limit: 256
+    networks:
+      - default
+      - render
     # Bind to loopback only — Caddy is the public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
@@ -54,3 +87,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  # The bridge Caddy and backend share, and the only one reachable from
+  # the host.
+  default:
+  # Carries backend → render and nothing else. `internal: true` gives it
+  # no gateway, so render has no route off the host.
+  render:
+    internal: true
