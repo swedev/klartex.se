@@ -106,9 +106,9 @@ Every recipe template accepts `page_template` in object form, the same shape the
 
 `page_template` in object form travels with the request — font, header font and footer are part of the data, so a call is self-contained and needs no account.
 
-A named page template — a reusable bundle with a logo and its own LaTeX fragment, referenced as `page_template: "<name>"` — is registered once at `POST /api/page-templates` and lives on the server. Writing to that registry requires a bearer token, so it answers `401` without one. Self-serve accounts are under development and not launched, so there is currently no way to obtain a token: `GET /api/page-templates` returning an empty list and `POST` returning `401` are the expected state, not a fault. Use the object form until then.
+A named page template — a reusable bundle with a logo and its own LaTeX fragment, referenced as `page_template: "<name>"` — is registered once at `POST /api/page-templates` and lives on the server. Writing to that registry requires a bearer token, so it answers `401` without one. Access is granted on request until self-serve accounts launch — email kontakt@klartex.se. `GET /api/page-templates` returning an empty list is the expected state, not a fault; use the object form until you have a bundle.
 
-`GET /api/blocks`, `GET /api/templates`, their `/schema` variants and `POST /api/render` need no token.
+`GET /api/blocks`, `GET /api/templates`, their `/schema` variants and `POST /api/render` need no token — with one exception. The `latex` block passes raw LaTeX to the compiler, so an anonymous render containing one answers `403` with a `detail` that names the block (`"type": "token_required"`, `"block_type": "latex"`) and points `path` at it. A token unlocks the full block surface; it does not raise the rate limit, which applies per IP either way.
 
 ## Change marking
 

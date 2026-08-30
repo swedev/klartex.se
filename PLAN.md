@@ -50,7 +50,7 @@ Faserna beskriver ordningen arbetet är tänkt att växa i, inte en tidsplan. Va
 | **Reverse proxy / TLS** | Caddy 2 med automatisk Let's Encrypt, byggd med rate limit-modulen | `Caddyfile` och `caddy/Dockerfile` i `infra/`. Tre vhosts. |
 | **API-image** | `ghcr.io/swedev/klartex-se-backend:<version>` (multi-arch, byggd på basimagen `ghcr.io/swedev/klartex-base` med TeX Live + mscorefonts) | Pinnad version i serverns `.env`, aldrig `:latest` i prod. Basen pinnas med tagg + digest i `backend/Dockerfile` och bumpas i egen PR. CI smoke-testar amd64-bygget innan multi-arch-push. |
 | **Bygge och deploy** | `v*`-tagg kör `.github/workflows/deploy.yml`: test → bygge → smoke-test → publicering → utrullning | En push till `main` bygger ingenting; `ci.yml` kör testerna. Basimagen byggs och publiceras från `swedev/klartex`. |
-| **Page-template-registry** | Filbaserad (`~klartex/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn | Writes kräver `ADMIN_TOKEN`. Per-org-auth kommer med #19. |
+| **Page-template-registry** | Filbaserad (`~klartex/klartex/page-templates/<namn>/`), base64-JSON-upload, gränser 1 MB template / 5 MB asset / 10 assets per namn | Writes kräver `API_TOKEN`. Per-org-auth kommer med #19. |
 | **Repo-struktur** | Webbappen i `app/` i detta repo, landningssidan i roten | Bryts ut till eget repo om scopet växer. |
 | **Domängräns** | `klartex.se` = landningssida, `app.klartex.se` = webbapp och API i ett ursprung: `backend/` i detta repo servas under `/api` | DNS hos Loopia, servern i Hetzner. Ett ursprung betyder ingen CORS. HTTP-ytan togs bort ur kärnan i `v0.11.0`. |
 | **Frontend-stack** | React 19 + TypeScript + Vite 6 + Tailwind 4 + Radix Themes + Tiptap | Beslutad i #14, med `~/repos/openvera/frontend` som referens. |
@@ -81,7 +81,7 @@ Slutsats för framtida bygg: börja brett, inte smalt.
 |------|-----------|
 | Tiptap ↔ klartex-JSON-rundresan blir lossy (inline-formatering, kapslade block) | Fas 2 har testsvit mot kärnans fixtures. Om förlustfrihet inte går: kör Tiptap som rendering-only och behåll JSON som källan — osmidigt UX, men det funkar. |
 | XeLaTeX-fel som är obegripliga för slutanvändare | Fas 6 har felöversättning. Kärnan exponerar redan strukturerade valideringsfel — det räcker långt. |
-| `/api/render` kör anropar-styrd LaTeX på en delad VM | Rate limit och resurstak finns (#20). Filläsning under kompilering är däremot öppen: TeX Live 2026 tillämpar inte längre `openin_any`, så skyddet måste bli process- eller OS-isolering i kärnan (`swedev/klartex#51`). Tills dess bör `latex`-blocket inte nås anonymt (#23). |
+| `/api/render` kör anropar-styrd LaTeX på en delad VM | Rate limit och resurstak finns (#20). Filläsning under kompilering är däremot öppen: TeX Live 2026 tillämpar inte längre `openin_any`, så skyddet måste bli process- eller OS-isolering i kärnan (`swedev/klartex#51`). `latex`-blocket kräver därför en token: ett anonymt anrop som innehåller ett sådant block avvisas med `403`. |
 | Branding-fragment-formatet ändras i kärnan | Branding-vyn ska bara generera fragment via kärnans schema, inte handgissa LaTeX. Ändras formatet, ändras genereringen — inte alla sparade brandings. |
 | Dokumentlagring (fas 5) växer till en filregister-design som inte är genomtänkt | Håll persistent storage minimal: bara `document_id → klartex_json`. Filregister-skissen i `filregister.md` aktiveras senare. |
 

@@ -11,7 +11,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 | `docker-compose.yml` | Stackdefinition: Caddy + klartex-backend. Deployas till `~/klartex/` på servern. |
 | `Caddyfile` | TLS + två vhosts: `klartex.se` och `app.klartex.se`, som servar både webbappen och `/api`. Rate limit + body-gräns på `POST /api/render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
-| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION`. |
+| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION` och bär `API_TOKEN`. |
 | `../.github/workflows/deploy.yml` | Deployar vid en `v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, restartar. |
 
 ## Från noll till live
@@ -26,7 +26,7 @@ Förutsätter att `hcloud` CLI är autentiserad och SSH-nyckeln uppladdad (se kl
 #    klartex.se / www / app  →  A-record
 
 # 3. Lägg env-filen på servern. Den görs en gång för hand och versionshanteras
-#    aldrig — den bär ADMIN_TOKEN. Deployen läser den, men rör aldrig annat än
+#    aldrig — den bär API_TOKEN. Deployen läser den, men rör aldrig annat än
 #    BACKEND_VERSION-raden.
 scp infra/.env.example klartex@<ip>:klartex/.env
 ssh -t klartex@<ip> "nano ~/klartex/.env"
@@ -45,6 +45,12 @@ git tag v0.2.3 && git push origin v0.2.3
 Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/api/health` rapporterar då skulle säga olika saker.
 
 Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version och deployar den imagen. Alla version-taggar ligger kvar i GHCR.
+
+### Övergången till `0.5.0`: `API_TOKEN` i `.env`
+
+`0.5.0` läser `API_TOKEN` där tidigare versioner läste `ADMIN_TOKEN`. Innan taggen pushas: lägg till raden `API_TOKEN=<samma värde som ADMIN_TOKEN>` i `~/klartex/.env` — deployen preflightar att den finns och är icke-tom, och stannar före rsyncen annars, så den körande stacken lämnas orörd.
+
+Behåll `ADMIN_TOKEN`-raden så länge en rollback till `v0.4.x` är tänkbar: en sådan rollback syncar den taggens compose-fil, som läser `ADMIN_TOKEN`, och writes skulle annars svara `503`. Ta bort raden när `0.5.0` legat stabilt.
 
 ## Caddy byggs på servern
 

@@ -182,6 +182,10 @@ jobs:
                echo "/home/klartex/klartex/.env is missing — create it on the server once, see infra/README.md" >&2
                exit 1
              fi
+             if ! grep -Eq "^API_TOKEN=.+" /home/klartex/klartex/.env; then
+               echo "API_TOKEN is not set in /home/klartex/klartex/.env — see infra/README.md" >&2
+               exit 1
+             fi
              umask 022; mkdir -p /home/klartex/deploy-backup
              rm -rf /home/klartex/deploy-backup/*
              for f in docker-compose.yml Caddyfile .env; do

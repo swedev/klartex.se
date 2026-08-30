@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from klartex_se.auth import require_admin
+from klartex_se.auth import require_api_token
 from klartex_se.page_templates import (
     PageTemplateError,
     PageTemplateExists,
@@ -55,9 +55,29 @@ def get(name: str) -> dict:
         raise HTTPException(404, f"Page template {name!r} not found") from e
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-def create(req: CreateBundle, _: None = Depends(require_admin)) -> dict:
-    """Create or replace a page-template bundle. Requires ADMIN_TOKEN."""
+AUTH_RESPONSES = {
+    401: {
+        "description": (
+            "No Bearer token was presented, or the presented token is "
+            "invalid. `detail.type` is `token_required` or `invalid_token`."
+        )
+    },
+    503: {
+        "description": (
+            "This instance has no API token configured. `detail.type` is "
+            "`token_not_configured`."
+        )
+    },
+}
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    responses=AUTH_RESPONSES,
+)
+def create(req: CreateBundle, _: None = Depends(require_api_token)) -> dict:
+    """Create or replace a page-template bundle. Requires `API_TOKEN`."""
     try:
         return save_bundle(
             name=req.name,
@@ -72,9 +92,13 @@ def create(req: CreateBundle, _: None = Depends(require_admin)) -> dict:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
 
 
-@router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT)
-def delete(name: str, _: None = Depends(require_admin)) -> None:
-    """Delete a bundle. Requires ADMIN_TOKEN."""
+@router.delete(
+    "/{name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=AUTH_RESPONSES,
+)
+def delete(name: str, _: None = Depends(require_api_token)) -> None:
+    """Delete a bundle. Requires `API_TOKEN`."""
     try:
         delete_bundle(name)
     except PageTemplateNotFound as e:

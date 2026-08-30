@@ -15,6 +15,10 @@ validation errors both carry `detail.path` — a
 `["body", 1, "items", 0, "text"]` list addressing the failing node in the
 submitted data — so a client can mark the offending block without parsing
 `detail.message`.
+
+The endpoint is tier-aware. Anonymous callers render every block except
+`latex`, which passes raw LaTeX to the compiler and answers `403
+token_required`; a valid API token unlocks the full block surface.
 """
 
 import logging
@@ -22,13 +26,14 @@ import re
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from jsonschema import ValidationError
 from pydantic import BaseModel, Field
 
 from klartex import render as klartex_render
 
+from klartex_se.auth import TOKEN_HOWTO, Tier, render_tier
 from klartex_se.page_templates import (
     PageTemplateNotFound,
     TEMPLATE_FILENAME,
@@ -94,6 +99,71 @@ def _block_error_path(exc: ValueError) -> list[str | int] | None:
     return path
 
 
+def _child_block_lists(
+    block: dict, path: list[str | int]
+) -> list[tuple[object, list[str | int]]]:
+    """Return the nested block lists of `block` as (blocks, path) pairs.
+
+    Mirrors `klartex.renderer._child_block_lists` — the core's single
+    source of truth for which block types nest other blocks — without
+    importing a private name into production code. A block type absent
+    here carries no blocks, so its remaining properties are ordinary
+    data. tests/test_render.py pins this against the core, so a carrier
+    added there fails a test rather than silently opening the gate.
+    """
+    btype = block.get("type")
+    if btype == "list":
+        return [
+            (item.get("content"), path + ["items", i, "content"])
+            for i, item in enumerate(block.get("items") or [])
+            if isinstance(item, dict)
+        ]
+    if btype == "columns":
+        return [
+            (column, path + ["items", i])
+            for i, column in enumerate(block.get("items") or [])
+            if isinstance(column, list)
+        ]
+    if btype == "clause":
+        return [(block.get("content"), path + ["content"])]
+    return []
+
+
+def find_latex_block(body: object) -> list[str | int] | None:
+    """Locate the first `latex` block in a `_block` body.
+
+    Returns the path to the first block carrying `"type": "latex"` — a
+    `["body", 0, "items", 1, 0]` list, the same shape `detail.path`
+    already uses — in document order, or None when there is none.
+
+    Only the positions the block engine actually reads as blocks are
+    visited: the top-level `body` list and, from there, the carriers in
+    `_child_block_lists`. Ordinary data is never mistaken for a block,
+    so a `parties` block whose `party1` happens to carry
+    `"type": "latex"` renders anonymously, exactly as the core renders
+    it. Iterative, since deeply nested request JSON must not be able to
+    raise RecursionError.
+    """
+    stack: list[tuple[object, list[str | int]]] = []
+
+    def push(blocks: object, path: list[str | int]) -> None:
+        if isinstance(blocks, list):
+            stack.extend(
+                (block, path + [i]) for i, block in reversed(list(enumerate(blocks)))
+            )
+
+    push(body, ["body"])
+    while stack:
+        block, path = stack.pop()
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "latex":
+            return path
+        for blocks, child_path in reversed(_child_block_lists(block, path)):
+            push(blocks, child_path)
+    return None
+
+
 class RenderRequest(BaseModel):
     template: str = Field(
         ...,
@@ -125,12 +195,51 @@ class RenderRequest(BaseModel):
                 "failing node when one can be identified."
             )
         },
+        401: {
+            "description": (
+                "An Authorization header was presented but does not carry "
+                "a usable token. `detail.type` is `token_required` when "
+                "the header lacks the `Bearer ` prefix and `invalid_token` "
+                "when the token does not match. Neither body carries "
+                "`path` or `block_type` — those belong to the 403."
+            )
+        },
+        403: {
+            "description": (
+                "The request uses a block the anonymous tier may not "
+                "render. `detail.type` is `token_required`, "
+                "`detail.block_type` names the block and `detail.path` "
+                "locates it."
+            )
+        },
         500: {"description": "xelatex failure"},
-        503: {"description": "Too many concurrent renders"},
+        503: {
+            "description": (
+                "Either too many concurrent renders (`detail.type` is "
+                "`overloaded`) or a token was presented to an instance "
+                "with none configured (`token_not_configured`)."
+            )
+        },
     },
 )
-def render(req: RenderRequest) -> Response:
+def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
     """Render a template + data combination to a PDF."""
+    if tier is Tier.ANONYMOUS and req.template == "_block":
+        latex_path = find_latex_block(req.data.get("body"))
+        if latex_path is not None:
+            raise HTTPException(
+                403,
+                detail={
+                    "type": "token_required",
+                    "block_type": "latex",
+                    "path": latex_path,
+                    "message": (
+                        "The 'latex' block passes raw LaTeX to the compiler "
+                        f"and requires an API token. {TOKEN_HOWTO}"
+                    ),
+                },
+            )
+
     page_template_source: str | None = None
     asset_dir: Path | None = None
     data = req.data

@@ -8,12 +8,52 @@ import pytest
 from fastapi.testclient import TestClient
 
 from klartex_se import render as render_module
+from klartex_se.auth import TOKEN_HOWTO
 from klartex_se.main import app
 
 client = TestClient(app)
 
 XELATEX = shutil.which("xelatex")
 needs_xelatex = pytest.mark.skipif(XELATEX is None, reason="xelatex not on PATH")
+
+API_TOKEN = "test-token-do-not-use-in-prod"
+
+
+@pytest.fixture(autouse=True)
+def no_ambient_token(monkeypatch):
+    """Anonymous is the default tier; tests that want a token opt in."""
+    monkeypatch.delenv("API_TOKEN", raising=False)
+
+
+@pytest.fixture
+def api_token(monkeypatch):
+    """Configure the instance token and hand back the matching header."""
+    monkeypatch.setenv("API_TOKEN", API_TOKEN)
+    return {"Authorization": f"Bearer {API_TOKEN}"}
+
+
+@pytest.fixture
+def fake_render(monkeypatch):
+    """Replace the compiler, so tier tests never invoke xelatex."""
+    calls: list[tuple] = []
+
+    def fake(*args, **kwargs):
+        calls.append((args, kwargs))
+        return b"%PDF-fake"
+
+    monkeypatch.setattr(render_module, "klartex_render", fake)
+    return calls
+
+
+LATEX_BLOCK = {"type": "latex", "body": "\\hrule"}
+
+
+def post_blocks(body_blocks, headers=None):
+    return client.post(
+        "/api/render",
+        json={"template": "_block", "data": {"body": body_blocks}},
+        headers=headers,
+    )
 
 
 def b64(s: str | bytes) -> str:
@@ -290,6 +330,236 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
     assert not any(t.is_alive() for t in threads)
     assert sorted(results.values()) == [200] * len(threads)
     assert_all_slots_free(render_slots)
+
+
+# --- Tiers: the `latex` block needs a token ---------------------------------
+
+
+def test_anonymous_latex_block_returns_403():
+    r = post_blocks([LATEX_BLOCK])
+    assert r.status_code == 403
+    detail = r.json()["detail"]
+    assert detail["type"] == "token_required"
+    assert detail["block_type"] == "latex"
+    assert detail["path"] == ["body", 0]
+    assert "latex" in detail["message"]
+    assert TOKEN_HOWTO in detail["message"]
+    # 403 is not an authentication challenge.
+    assert "WWW-Authenticate" not in r.headers
+
+
+@pytest.mark.parametrize(
+    "blocks, expected_path",
+    [
+        (
+            [{"type": "columns", "items": [[{"type": "text", "text": "a"}],
+                                           [LATEX_BLOCK]]}],
+            ["body", 0, "items", 1, 0],
+        ),
+        (
+            [{"type": "list", "items": [{"content": [LATEX_BLOCK]}]}],
+            ["body", 0, "items", 0, "content", 0],
+        ),
+        (
+            [{"type": "clause", "content": [LATEX_BLOCK]}],
+            ["body", 0, "content", 0],
+        ),
+    ],
+    ids=["columns", "list", "clause"],
+)
+def test_anonymous_nested_latex_block_returns_403(blocks, expected_path):
+    r = post_blocks(blocks)
+    assert r.status_code == 403
+    detail = r.json()["detail"]
+    assert detail["type"] == "token_required"
+    assert detail["path"] == expected_path
+
+
+def test_latex_gate_precedes_the_semaphore(render_slots, fake_render):
+    """The 403 does not depend on a free render slot, and renders nothing."""
+    for _ in range(render_module.MAX_CONCURRENT_RENDERS):
+        assert render_slots.acquire(blocking=False)
+
+    r = post_blocks([LATEX_BLOCK])
+
+    assert r.status_code == 403
+    assert r.json()["detail"]["type"] == "token_required"
+    assert fake_render == []
+
+
+def test_token_unlocks_the_latex_block(api_token, fake_render):
+    r = post_blocks([LATEX_BLOCK], headers=api_token)
+    assert r.status_code == 200, r.text
+    assert len(fake_render) == 1
+
+
+def test_wrong_token_is_401_not_anonymous(api_token, fake_render):
+    """A presented but wrong token fails loudly rather than degrading."""
+    wrong = {"Authorization": "Bearer nope"}
+
+    r = post_blocks([{"type": "heading", "text": "x"}], headers=wrong)
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "invalid_token"
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+    assert fake_render == []
+
+
+def test_wrong_token_with_latex_is_401_not_403(api_token):
+    """Verification runs before the block policy."""
+    r = post_blocks([LATEX_BLOCK], headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "invalid_token"
+
+
+def test_token_without_bearer_prefix_is_401(api_token):
+    r = post_blocks([LATEX_BLOCK], headers={"Authorization": API_TOKEN})
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "token_required"
+
+
+def test_non_ascii_token_is_401_not_500(api_token):
+    """Header bytes outside ASCII must not blow up the comparison."""
+    r = post_blocks(
+        [{"type": "heading", "text": "x"}],
+        # Latin-1 on the wire, which is how Starlette decodes header bytes.
+        headers={"Authorization": b"Bearer nyckel-med-\xe5\xe4\xf6"},
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"]["type"] == "invalid_token"
+
+
+def test_presented_token_without_configured_token_is_503(fake_render):
+    r = post_blocks(
+        [{"type": "heading", "text": "x"}],
+        headers={"Authorization": f"Bearer {API_TOKEN}"},
+    )
+    assert r.status_code == 503
+    assert r.json()["detail"]["type"] == "token_not_configured"
+    assert fake_render == []
+
+
+def test_anonymous_render_works_without_a_configured_token(fake_render):
+    """The release smoke test renders anonymously with no token in env."""
+    r = post_blocks([{"type": "heading", "text": "x"}])
+    assert r.status_code == 200, r.text
+    assert len(fake_render) == 1
+
+
+def test_recipe_template_is_not_scanned_for_latex(fake_render):
+    """The policy covers `_block` only; a recipe never interprets blocks."""
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "faktura",
+            "data": {"body": [LATEX_BLOCK], "rader": [{"type": "latex"}]},
+        },
+    )
+    assert r.status_code != 403
+
+
+def test_openapi_documents_render_auth_responses():
+    responses = client.get("/api/openapi.json").json()["paths"]["/api/render"]["post"][
+        "responses"
+    ]
+    assert {"401", "403"} <= set(responses)
+    description = responses["503"]["description"]
+    assert "overloaded" in description
+    assert "token_not_configured" in description
+
+
+# --- find_latex_block ------------------------------------------------------
+
+
+@pytest.mark.parametrize("body", [None, [], {}, "text", 5])
+def test_find_latex_block_returns_none_without_a_latex_block(body):
+    assert render_module.find_latex_block(body) is None
+
+
+def test_find_latex_block_skips_non_container_entries():
+    body = ["a", 1, None, {"type": "text", "text": "x"}]
+    assert render_module.find_latex_block(body) is None
+
+
+def test_find_latex_block_returns_first_in_document_order():
+    body = [
+        {"type": "columns", "items": [[LATEX_BLOCK], [LATEX_BLOCK]]},
+        LATEX_BLOCK,
+    ]
+    assert render_module.find_latex_block(body) == ["body", 0, "items", 0, 0]
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {
+            "type": "parties",
+            "party1": {"name": "Alfa AB", "type": "latex"},
+            "party2": {"name": "Beta AB"},
+        },
+        {"type": "signatures", "parties": [{"name": "Alfa AB", "type": "latex"}]},
+    ],
+    ids=["parties", "signatures"],
+)
+def test_find_latex_block_ignores_ordinary_data(block):
+    """Only block positions count — a data field is not a block.
+
+    `parties.party1` and `signatures.parties[i]` permit extra properties,
+    so a party may legitimately carry `type`. The core never reads those
+    as blocks and renders the document, so neither may the gate reject it.
+    """
+    assert render_module.find_latex_block([block]) is None
+
+
+def test_anonymous_party_carrying_a_type_field_still_renders(fake_render):
+    """The false positive above, end to end."""
+    r = post_blocks(
+        [
+            {
+                "type": "parties",
+                "party1": {"name": "Alfa AB", "type": "latex"},
+                "party2": {"name": "Beta AB"},
+            }
+        ]
+    )
+    assert r.status_code == 200, r.text
+    assert len(fake_render) == 1
+
+
+def test_find_latex_block_ignores_non_carrier_properties():
+    """An unknown block's own properties are data, not a block list."""
+    body = [{"type": "future", "panes": {"left": {"stack": [LATEX_BLOCK]}}}]
+    assert render_module.find_latex_block(body) is None
+
+
+def test_carrier_map_matches_the_core():
+    """Pin the local carrier map against klartex's own.
+
+    `render._child_block_lists` mirrors `klartex.renderer._child_block_lists`
+    so production code does not depend on a private core name. If the core
+    starts nesting blocks in a type this map does not know, an anonymous
+    caller could hide a `latex` block there — so that must fail here rather
+    than pass silently.
+    """
+    from klartex.block_engine import KNOWN_BLOCK_TYPES
+    from klartex.renderer import _child_block_lists as core_carriers
+
+    for block_type in sorted(KNOWN_BLOCK_TYPES):
+        probe = {
+            "type": block_type,
+            "items": [{"content": [LATEX_BLOCK]}, [LATEX_BLOCK]],
+            "content": [LATEX_BLOCK],
+        }
+        ours = [blocks for blocks, _ in render_module._child_block_lists(probe, [])]
+        theirs = [blocks for _, blocks in core_carriers(probe)]
+        assert ours == theirs, f"carrier mismatch for block type {block_type!r}"
+
+
+def test_find_latex_block_survives_deep_nesting():
+    """Deeply nested carriers must not raise RecursionError."""
+    body: object = [LATEX_BLOCK]
+    for _ in range(5_000):
+        body = [{"type": "clause", "content": body}]
+    assert render_module.find_latex_block(body) is not None
 
 
 def test_every_route_lives_under_api():

@@ -259,9 +259,9 @@ GET  /api/blocks/text/schema         # JSON Schema för en blocktyp</code></pre>
 
   <h2>Vad som är öppet</h2>
 
-  <p>Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och renderingsanropen är takade per IP-adress.</p>
+  <p>Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och renderingsanropen är takade per IP-adress. Ett undantag: <code>latex</code>-blocket skickar rå LaTeX vidare till kompilatorn och kräver en token — ett anonymt anrop med ett sådant block svarar <code>403</code> och pekar ut blocket.</p>
 
-  <p>Att registrera en <strong>egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver ett konto. <strong>Konton är under utveckling och inte lanserade än</strong>, så <code>POST /api/page-templates</code> svarar <code>401</code> tills vidare. Det är väntat och inte ett fel. Fram till dess går egen formgivning att skicka med per anrop via <code>page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan.</p>
+  <p>Att registrera en <strong>egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver en token, och <code>POST /api/page-templates</code> svarar <code>401</code> utan. <strong>Konton är under utveckling och inte lanserade än</strong>; fram till dess ges åtkomst på förfrågan — mejla <a href="mailto:kontakt@klartex.se">kontakt@klartex.se</a>. Egen formgivning går också att skicka med per anrop via <code>page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan och fungerar utan token.</p>
 
   </main>
 

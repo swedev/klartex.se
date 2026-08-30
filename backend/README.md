@@ -6,20 +6,37 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 
 ## Endpoints
 
-| Metod & path | Vad |
-|--------------|-----|
-| `GET /api/health` | Liveness — används av Docker healthcheck |
-| `GET /api/templates` | Lista mallar (block-engine + recipe) |
-| `GET /api/templates/{name}/schema` | JSON Schema för en mall |
-| `GET /api/blocks` | Lista block-engine-blocktyper |
-| `GET /api/blocks/{name}/schema` | JSON Schema för en blocktyp |
-| `POST /api/render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 |
-| `GET /api/page-templates` | Lista registrerade sidmalls-bundles |
-| `GET /api/page-templates/{name}` | Metadata för en bundle |
-| `POST /api/page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) — kräver `ADMIN_TOKEN` |
-| `DELETE /api/page-templates/{name}` | Ta bort en bundle — kräver `ADMIN_TOKEN` |
+| Metod & path | Vad | Token |
+|--------------|-----|-------|
+| `GET /api/health` | Liveness — används av Docker healthcheck | Nej |
+| `GET /api/templates` | Lista mallar (block-engine + recipe) | Nej |
+| `GET /api/templates/{name}/schema` | JSON Schema för en mall | Nej |
+| `GET /api/blocks` | Lista block-engine-blocktyper | Nej |
+| `GET /api/blocks/{name}/schema` | JSON Schema för en blocktyp | Nej |
+| `POST /api/render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 | Nej — utom `latex`-blocket |
+| `GET /api/page-templates` | Lista registrerade sidmalls-bundles | Nej |
+| `GET /api/page-templates/{name}` | Metadata för en bundle | Nej |
+| `POST /api/page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) | Ja |
+| `DELETE /api/page-templates/{name}` | Ta bort en bundle | Ja |
 
 Multipart-varianten `/api/render-with-assets` (logo + `.tex.jinja`-upload) tillkommer i nästa iteration.
+
+## Autentisering
+
+Instansen bär en delad token i env-variabeln `API_TOKEN` (se `infra/.env.example`). Den presenteras som `Authorization: Bearer <token>`.
+
+Två nivåer:
+
+| Nivå | Vad som går att göra |
+|------|----------------------|
+| Anonym (ingen `Authorization`-header) | Discovery, `GET` på registret, och rendering av alla block **utom** `latex` |
+| Token | Hela blockytan, inklusive `latex`, plus `POST`/`DELETE` på `/api/page-templates` |
+
+En token låser upp *blockytan*, inte en högre kvot: Caddys tak på 10 anrop per minut och IP gäller båda nivåerna (kvot per nivå hör till #23).
+
+Ett presenterat men felaktigt token ger `401` även på `/api/render` — anropet degraderas inte tyst till anonymt, så en trasig integration går att skilja från ett avsiktligt anonymt anrop. Saknas `API_TOKEN` på instansen svarar varje anrop som presenterar en token `503`; de anonyma vägarna fungerar ändå.
+
+Tokenen är ett stopgap: en enda hemlighet som ger full åtkomst till alla bundles. Konton och self-serve-tokens är #19. Åtkomst ges på förfrågan tills dess — mejla kontakt@klartex.se.
 
 ## Felsvar från `/api/render`
 
@@ -30,8 +47,16 @@ Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `
 | `validation_error` | 400 | Datat bryter mot mallens JSON Schema | Alltid |
 | `input_error` | 400 | Blockvalidering, okänd mall, ogiltig `asset_dir` | När ett block kan pekas ut |
 | `unknown_page_template` | 400 | `page_template` är varken registrerad bundle eller inbyggd | Nej |
+| `token_required` | 401 | En `Authorization`-header presenterades utan `Bearer `-prefix | Nej |
+| `invalid_token` | 401 | Ett token presenterades men stämmer inte | Nej |
+| `token_required` | 403 | Anonymt anrop med ett `latex`-block; `block_type` namnger blocket | Alltid |
+| `token_not_configured` | 503 | Ett token presenterades till en instans som saknar `API_TOKEN` | Nej |
 | `overloaded` | 503 | Båda render-platserna upptagna (se nedan) | Nej |
 | `render_error` | 500 | `xelatex` misslyckades | Nej |
+
+`token_required` och `503` är var för sig tvetydiga: `detail.type` ensam räcker inte, utan en klient som förgrenar på feltyp måste läsa statuskoden också. `token_required` med `401` betyder att headern inte gick att tolka och bär varken `path` eller `block_type`; med `403` betyder den att anropet var giltigt som anonymt men innehåller ett `latex`-block, och då finns båda fälten. `503` betyder antingen `overloaded` eller `token_not_configured`.
+
+`POST`/`DELETE /api/page-templates` svarar med samma `detail`-form: `401` (`token_required` när headern saknas, `invalid_token` när tokenen är fel) och `503` (`token_not_configured`). `403` förekommer bara på `/api/render`, där anropet var giltigt som anonymt men blocket kräver mer.
 
 `path` är en lista som adresserar den felande noden i `data`, i samma form som jsonschemas `absolute_path`: `["body", 1]` för ett block, `["body", 0, "items", 0, "text"]` för ett fält inne i ett block, `[]` för roten av `data` (t.ex. när `body` saknas). En klient kan alltså markera rätt block utan att tolka `message`, vars formuleringar ägs av klartex-kärnan.
 
