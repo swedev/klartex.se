@@ -11,7 +11,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 | `docker-compose.yml` | Stackdefinition: Caddy + klartex-backend. Deployas till `~/klartex/` på servern. |
 | `Caddyfile` | TLS + två vhosts: `klartex.se` och `app.klartex.se`, som servar både webbappen och `/api`. Rate limit + body-gräns på `POST /api/render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
-| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION` och bär `API_TOKEN`. |
+| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION`; `API_TOKEN` är valfri. |
 | `../.github/workflows/deploy.yml` | Deployar vid en `v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, restartar. |
 
 ## Från noll till live
@@ -46,11 +46,9 @@ Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör
 
 Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version och deployar den imagen. Alla version-taggar ligger kvar i GHCR.
 
-### Övergången till `0.5.0`: `API_TOKEN` i `.env`
+### `API_TOKEN` i `.env` är valfri
 
-`0.5.0` läser `API_TOKEN` där tidigare versioner läste `ADMIN_TOKEN`. Innan taggen pushas: lägg till raden `API_TOKEN=<samma värde som ADMIN_TOKEN>` i `~/klartex/.env` — deployen preflightar att den finns och är icke-tom, och stannar före rsyncen annars, så den körande stacken lämnas orörd.
-
-Behåll `ADMIN_TOKEN`-raden så länge en rollback till `v0.4.x` är tänkbar: en sådan rollback syncar den taggens compose-fil, som läser `ADMIN_TOKEN`, och writes skulle annars svara `503`. Ta bort raden när `0.5.0` legat stabilt.
+Osatt är det mest stängda läget: vanlig rendering och discovery är öppna, `latex`-blocket svarar `403` för alla och skrivningar mot page-templates `503`. Satt låser tokenen upp båda för den som skickar den. Ingen token behöver alltså finnas på servern för att deploya — parkoppling via parla (#19) ersätter den delade tokenen, och `ADMIN_TOKEN` från `v0.4.x` kan ligga kvar eller tas bort utan att något händer.
 
 ## Caddy byggs på servern
 

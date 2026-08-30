@@ -19,7 +19,9 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      API_TOKEN: ${API_TOKEN:?API_TOKEN missing in .env — see infra/README.md}
+      # Optional. Unset: the latex block answers 403 for everyone and
+      # page-template writes answer 503. Set: the token unlocks both.
+      API_TOKEN: ${API_TOKEN:-}
       PAGE_TEMPLATES_DIR: /data/page-templates
     volumes:
       # Persistent storage for uploaded page-template bundles.
