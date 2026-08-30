@@ -47,13 +47,14 @@ Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `
 | `validation_error` | 400 | Datat bryter mot mallens JSON Schema | Alltid |
 | `input_error` | 400 | Blockvalidering, okänd mall, ogiltig `asset_dir` | När ett block kan pekas ut |
 | `unknown_page_template` | 400 | `page_template` är varken registrerad bundle eller inbyggd | Nej |
+| `token_required` | 401 | En `Authorization`-header presenterades utan `Bearer `-prefix | Nej |
 | `invalid_token` | 401 | Ett token presenterades men stämmer inte | Nej |
 | `token_required` | 403 | Anonymt anrop med ett `latex`-block; `block_type` namnger blocket | Alltid |
 | `token_not_configured` | 503 | Ett token presenterades till en instans som saknar `API_TOKEN` | Nej |
 | `overloaded` | 503 | Båda render-platserna upptagna (se nedan) | Nej |
 | `render_error` | 500 | `xelatex` misslyckades | Nej |
 
-`503` betyder alltså antingen `overloaded` eller `token_not_configured` — `detail.type` skiljer dem åt.
+`token_required` och `503` är var för sig tvetydiga: `detail.type` ensam räcker inte, utan en klient som förgrenar på feltyp måste läsa statuskoden också. `token_required` med `401` betyder att headern inte gick att tolka och bär varken `path` eller `block_type`; med `403` betyder den att anropet var giltigt som anonymt men innehåller ett `latex`-block, och då finns båda fälten. `503` betyder antingen `overloaded` eller `token_not_configured`.
 
 `POST`/`DELETE /api/page-templates` svarar med samma `detail`-form: `401` (`token_required` när headern saknas, `invalid_token` när tokenen är fel) och `503` (`token_not_configured`). `403` förekommer bara på `/api/render`, där anropet var giltigt som anonymt men blocket kräver mer.
 

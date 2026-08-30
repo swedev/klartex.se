@@ -99,29 +99,68 @@ def _block_error_path(exc: ValueError) -> list[str | int] | None:
     return path
 
 
-def find_latex_block(body: object) -> list[str | int] | None:
-    """Locate the first `latex` block anywhere under a `_block` body.
+def _child_block_lists(
+    block: dict, path: list[str | int]
+) -> list[tuple[object, list[str | int]]]:
+    """Return the nested block lists of `block` as (blocks, path) pairs.
 
-    Walks dicts and lists in document order and returns the path to the
-    first dict carrying `"type": "latex"` — a `["body", 0, "items", 1, 0]`
-    list, the same shape `detail.path` already uses — or None when there
-    is none. The walk is generic rather than schema-aware, so a `latex`
-    block is found inside any carrier block (`list`, `columns`, `clause`,
-    and any carrier added later). Iterative, since deeply nested request
-    JSON must not be able to raise RecursionError.
+    Mirrors `klartex.renderer._child_block_lists` — the core's single
+    source of truth for which block types nest other blocks — without
+    importing a private name into production code. A block type absent
+    here carries no blocks, so its remaining properties are ordinary
+    data. tests/test_render.py pins this against the core, so a carrier
+    added there fails a test rather than silently opening the gate.
     """
-    stack: list[tuple[object, list[str | int]]] = [(body, ["body"])]
+    btype = block.get("type")
+    if btype == "list":
+        return [
+            (item.get("content"), path + ["items", i, "content"])
+            for i, item in enumerate(block.get("items") or [])
+            if isinstance(item, dict)
+        ]
+    if btype == "columns":
+        return [
+            (column, path + ["items", i])
+            for i, column in enumerate(block.get("items") or [])
+            if isinstance(column, list)
+        ]
+    if btype == "clause":
+        return [(block.get("content"), path + ["content"])]
+    return []
+
+
+def find_latex_block(body: object) -> list[str | int] | None:
+    """Locate the first `latex` block in a `_block` body.
+
+    Returns the path to the first block carrying `"type": "latex"` — a
+    `["body", 0, "items", 1, 0]` list, the same shape `detail.path`
+    already uses — in document order, or None when there is none.
+
+    Only the positions the block engine actually reads as blocks are
+    visited: the top-level `body` list and, from there, the carriers in
+    `_child_block_lists`. Ordinary data is never mistaken for a block,
+    so a `parties` block whose `party1` happens to carry
+    `"type": "latex"` renders anonymously, exactly as the core renders
+    it. Iterative, since deeply nested request JSON must not be able to
+    raise RecursionError.
+    """
+    stack: list[tuple[object, list[str | int]]] = []
+
+    def push(blocks: object, path: list[str | int]) -> None:
+        if isinstance(blocks, list):
+            stack.extend(
+                (block, path + [i]) for i, block in reversed(list(enumerate(blocks)))
+            )
+
+    push(body, ["body"])
     while stack:
-        node, path = stack.pop()
-        if isinstance(node, dict):
-            if node.get("type") == "latex":
-                return path
-            children = [(value, path + [key]) for key, value in node.items()]
-        elif isinstance(node, list):
-            children = [(value, path + [i]) for i, value in enumerate(node)]
-        else:
+        block, path = stack.pop()
+        if not isinstance(block, dict):
             continue
-        stack.extend(reversed(children))
+        if block.get("type") == "latex":
+            return path
+        for blocks, child_path in reversed(_child_block_lists(block, path)):
+            push(blocks, child_path)
     return None
 
 
@@ -158,8 +197,11 @@ class RenderRequest(BaseModel):
         },
         401: {
             "description": (
-                "An Authorization header was presented but the token is "
-                "invalid. `detail.type` is `invalid_token`."
+                "An Authorization header was presented but does not carry "
+                "a usable token. `detail.type` is `token_required` when "
+                "the header lacks the `Bearer ` prefix and `invalid_token` "
+                "when the token does not match. Neither body carries "
+                "`path` or `block_type` — those belong to the 403."
             )
         },
         403: {

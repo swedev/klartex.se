@@ -488,17 +488,77 @@ def test_find_latex_block_returns_first_in_document_order():
     assert render_module.find_latex_block(body) == ["body", 0, "items", 0, 0]
 
 
-def test_find_latex_block_finds_it_in_an_unknown_structure():
+@pytest.mark.parametrize(
+    "block",
+    [
+        {
+            "type": "parties",
+            "party1": {"name": "Alfa AB", "type": "latex"},
+            "party2": {"name": "Beta AB"},
+        },
+        {"type": "signatures", "parties": [{"name": "Alfa AB", "type": "latex"}]},
+    ],
+    ids=["parties", "signatures"],
+)
+def test_find_latex_block_ignores_ordinary_data(block):
+    """Only block positions count — a data field is not a block.
+
+    `parties.party1` and `signatures.parties[i]` permit extra properties,
+    so a party may legitimately carry `type`. The core never reads those
+    as blocks and renders the document, so neither may the gate reject it.
+    """
+    assert render_module.find_latex_block([block]) is None
+
+
+def test_anonymous_party_carrying_a_type_field_still_renders(fake_render):
+    """The false positive above, end to end."""
+    r = post_blocks(
+        [
+            {
+                "type": "parties",
+                "party1": {"name": "Alfa AB", "type": "latex"},
+                "party2": {"name": "Beta AB"},
+            }
+        ]
+    )
+    assert r.status_code == 200, r.text
+    assert len(fake_render) == 1
+
+
+def test_find_latex_block_ignores_non_carrier_properties():
+    """An unknown block's own properties are data, not a block list."""
     body = [{"type": "future", "panes": {"left": {"stack": [LATEX_BLOCK]}}}]
-    assert render_module.find_latex_block(body) == [
-        "body", 0, "panes", "left", "stack", 0
-    ]
+    assert render_module.find_latex_block(body) is None
+
+
+def test_carrier_map_matches_the_core():
+    """Pin the local carrier map against klartex's own.
+
+    `render._child_block_lists` mirrors `klartex.renderer._child_block_lists`
+    so production code does not depend on a private core name. If the core
+    starts nesting blocks in a type this map does not know, an anonymous
+    caller could hide a `latex` block there — so that must fail here rather
+    than pass silently.
+    """
+    from klartex.block_engine import KNOWN_BLOCK_TYPES
+    from klartex.renderer import _child_block_lists as core_carriers
+
+    for block_type in sorted(KNOWN_BLOCK_TYPES):
+        probe = {
+            "type": block_type,
+            "items": [{"content": [LATEX_BLOCK]}, [LATEX_BLOCK]],
+            "content": [LATEX_BLOCK],
+        }
+        ours = [blocks for blocks, _ in render_module._child_block_lists(probe, [])]
+        theirs = [blocks for _, blocks in core_carriers(probe)]
+        assert ours == theirs, f"carrier mismatch for block type {block_type!r}"
 
 
 def test_find_latex_block_survives_deep_nesting():
-    body: object = LATEX_BLOCK
+    """Deeply nested carriers must not raise RecursionError."""
+    body: object = [LATEX_BLOCK]
     for _ in range(5_000):
-        body = [body]
+        body = [{"type": "clause", "content": body}]
     assert render_module.find_latex_block(body) is not None
 
 
