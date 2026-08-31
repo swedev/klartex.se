@@ -104,7 +104,7 @@ Every recipe template accepts `page_template` in object form, the same shape the
 
 `POST /api/render` takes a body of `{"template": "<template name>", "data": { ... }, "page_template": "<registered bundle name>"}`. Template data goes inside `data` — including `page_template` in object form, which is part of the template schema. The top-level `page_template` field is either a string naming a bundle registered on the server, or a page-template object, which is passed through as `data.page_template`. A bundle name inside `data` fails schema validation with `400`.
 
-A bundle carries one `.tex.jinja` describing the whole page. It reaches the renderer as the header slot's source with the footer set to `null`, so the bundle owns the page: a `footer` sent in `data.page_template` gives way, while the other settings there still apply.
+A bundle carries one `.tex.jinja` describing the whole page. It reaches the renderer as the header slot's source with the footer set to `null`, so the bundle owns both slots: a `header` or a `footer` sent in `data.page_template` gives way. The document-level settings there — `font`, `header_font`, `diff_style`, `page_numbers` and `first_page_header` — still apply.
 
 `page_template` in object form travels with the request — font, header font and footer are part of the data, so a call is self-contained and needs no account.
 
