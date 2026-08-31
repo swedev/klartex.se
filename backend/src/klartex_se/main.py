@@ -1,10 +1,12 @@
-"""FastAPI app entrypoint. Mounts discovery + render routers under /api."""
+"""FastAPI app entrypoint. Mounts the account, discovery, registry and
+render routers under /api."""
 
 import importlib.metadata
 
 from fastapi import APIRouter, FastAPI
 
 from klartex_se import __version__
+from klartex_se.accounts import router as accounts_router
 from klartex_se.discovery import router as discovery_router
 from klartex_se.page_template_router import router as page_template_router
 from klartex_se.render import router as render_router
@@ -41,6 +43,7 @@ def health() -> dict:
     }
 
 
+api_router.include_router(accounts_router)
 api_router.include_router(discovery_router)
 api_router.include_router(page_template_router)
 api_router.include_router(render_router)

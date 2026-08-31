@@ -50,10 +50,10 @@ app.klartex.se {
         max_size 2MB
     }
 
-    # Coarse per-IP cap on renders. Caddy has no trusted_proxies here, so
-    # {client_ip} is the real peer address and X-Forwarded-For cannot
-    # bypass it. IPv6 is bucketed per /64 so address rotation inside one
-    # prefix shares a bucket. Other endpoints stay unlimited.
+    # Coarse per-IP caps. Caddy has no trusted_proxies here, so {client_ip}
+    # is the real peer address and X-Forwarded-For cannot bypass it. IPv6 is
+    # bucketed per /64 so address rotation inside one prefix shares a
+    # bucket. Other endpoints stay unlimited.
     rate_limit {
         zone render_per_ip {
             match {
@@ -63,6 +63,24 @@ app.klartex.se {
             key         {client_ip}
             events      10
             window      1m
+            ipv6_prefix 64
+        }
+
+        # Sign-in mails the address whatever it is — there is no allowlist,
+        # because accounts are self-serve. The backend's own cooldown is
+        # per address, which bounds how often one mailbox can be mailed but
+        # not how many mailboxes one caller can reach; this bounds that.
+        # The window is generous enough for a shared NAT: a person needs
+        # one or two codes, and 20 an hour still caps what an abuser can
+        # send from a single address.
+        zone auth_code_per_ip {
+            match {
+                method POST
+                path /api/auth/request-code
+            }
+            key         {client_ip}
+            events      20
+            window      1h
             ipv6_prefix 64
         }
     }
