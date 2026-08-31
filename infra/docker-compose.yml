@@ -2,15 +2,25 @@
 # Deployed to ~klartex/klartex/docker-compose.yml on the Hetzner server.
 # Pinned versions come from .env; never use :latest in prod.
 #
-# Resource budget: the host is a cax11 (2 vCPU, 4 GB), and every cap below
-# is a ceiling rather than a reservation. The memory ceilings sum to 2560m,
-# leaving ~1.5 GB for the OS, Docker and Caddy. render carries the bulk of
-# it because it is the only service that compiles; postgres holds accounts
-# and pairings in 512m; backend keeps 256m, the cap the memory budget in
-# #19 settled on to make room for the database, with its in-flight cap of 2
-# bounding how many bundle payloads it builds at once. The CPU quotas sum
-# to the host's 2 vCPU, and backend barely uses its share, so Caddy
-# competes with render in practice.
+# Resource budget: the host is a cax11 (2 vCPU, 3.7 GiB usable), and every
+# cap below is a ceiling rather than a reservation. The memory ceilings sum
+# to 3072m, leaving ~700m for the OS, Docker and Caddy — comfortable in
+# practice, where the measured peaks are render 517m, backend 52m and caddy
+# 13m. render carries the bulk of the ceiling because it is the only
+# service that compiles; postgres holds accounts and pairings in 512m.
+#
+# backend keeps 768m because of the bundle path, not its idle footprint: a
+# bundle at the registry limits (MAX_ASSETS=10 x MAX_ASSET_BYTES=5 MB, plus
+# a 1 MB template) is ~68 MB once base64-encoded, and the decoded copy, the
+# encoded mapping and the serialized JSON body are all live at once. The
+# in-flight cap of 2 admits two of those concurrently, which is what sets
+# the ceiling. Lowering it means lowering MAX_ASSETS, MAX_ASSET_BYTES or
+# MAX_INFLIGHT_RENDERS first.
+#
+# The CPU quotas sum to 2.5 on 2 vCPU, so they are deliberately
+# oversubscribed: backend and postgres are idle whenever render is busy,
+# and capping them at a true share would only slow the paths that never
+# compete.
 # memswap_limit == mem_limit disables swap throughout: a render that blows
 # its cap is OOM-killed rather than thrashing the disk.
 
@@ -90,8 +100,8 @@ services:
     container_name: klartex-se-backend
     restart: unless-stopped
     cpus: "0.5"
-    mem_limit: 256m
-    memswap_limit: 256m
+    mem_limit: 768m
+    memswap_limit: 768m
     pids_limit: 128
     depends_on:
       render:

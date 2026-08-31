@@ -11,9 +11,16 @@ name: Release
 # Migrations are forward-only. The deploy runs preflight → stop → dump →
 # migrate → start: the new image resolves the running database's revision
 # while the old stack still serves, so a rollback across a migration fails
-# before production is taken down. Rollback via workflow_dispatch is
-# therefore supported only to versions on the same migration head — roll
-# forward otherwise. See infra/README.md.
+# before production is taken down.
+#
+# That gate does NOT protect a workflow_dispatch from an older tag. Actions
+# runs the workflow definition at the dispatched ref, so a tag cut before
+# this preflight existed deploys with its own, unguarded, version of this
+# file and will happily restart the old stack against a migrated database.
+# Rollback is therefore supported only to versions on the same migration
+# head, and it is the operator who has to confirm that — compare the tag's
+# backend/migrations/versions/ against what `alembic current` reports on
+# the server before dispatching. See infra/README.md.
 #
 # The frontend at app.klartex.se is not deployed here. ~/app is fed from
 # app/dist, and the source that builds it lives on the unmerged #14 branch
@@ -333,8 +340,12 @@ jobs:
                   echo "  Roll forward with a fixed release, or restore the pre-migration dump:"
                   echo "    cd /home/klartex/klartex"
                   echo "    docker compose up -d postgres"
+                  echo "    docker compose exec -T postgres psql -U klartex -d klartex -v ON_ERROR_STOP=1 \\"
+                  echo "      -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'"
                   echo "    gunzip -c $dump | docker compose exec -T postgres psql -U klartex -d klartex -v ON_ERROR_STOP=1"
-                  echo "  Dump: $dump — see infra/README.md for the full procedure."
+                  echo "  The schema reset is not optional: the dump drops only what it contains, and"
+                  echo "  a table the failed migration created is not in it."
+                  echo "  Dump: $dump — full procedure in infra/README.md."
                   exit 1
               fi
               echo "✗ deploy failed — restoring config from /home/klartex/deploy-backup"

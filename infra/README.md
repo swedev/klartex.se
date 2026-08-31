@@ -62,7 +62,9 @@ git tag v0.2.3 && git push origin v0.2.3
 
 Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör servern, eftersom image-taggen och det `/api/health` rapporterar då skulle säga olika saker.
 
-Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version *och dess kärn-pin*, och deployar det matchande paret. Alla version-taggar ligger kvar i GHCR. Rollback stöds bara till versioner på **samma migrations-head** — se nästa avsnitt.
+Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version *och dess kärn-pin*, och deployar det matchande paret. Alla version-taggar ligger kvar i GHCR.
+
+Rollback stöds bara till versioner på **samma migrations-head**, och det är operatören som måste kontrollera det. Actions kör workflow-definitionen som ligger på den ref som dispatchas, så en tagg från före migrationspreflighten deployar med sin egen, ogrindade, version av `deploy.yml` — den startar den gamla stacken mot en redan migrerad databas utan att någon kontroll säger ifrån. Jämför taggens `backend/migrations/versions/` med vad `alembic current` rapporterar på servern innan du dispatchar.
 
 Kör compose-filen mot en `.env` som saknar `KLARTEX_VERSION` stannar `docker compose pull` på den saknade variabeln — före omstarten, med den körande stacken orörd.
 
@@ -128,7 +130,7 @@ Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka
 
 `POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
 
-`render` har dessutom ett tak på två samtidiga kompileringar (503 + `Retry-After`), och `backend` håller ett lika stort tak på anrop i luften dit. Alla tre containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB) står i kommentaren överst i den filen. `render` bär huvuddelen av minnestaket eftersom det är den som kompilerar; `backend` har 256m för de bundle-payloads den bygger, och `postgres` 512m.
+`render` har dessutom ett tak på två samtidiga kompileringar (503 + `Retry-After`), och `backend` håller ett lika stort tak på anrop i luften dit. Alla tre containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB) står i kommentaren överst i den filen. `render` bär huvuddelen av minnestaket eftersom det är den som kompilerar; `backend` har 768m för de bundle-payloads den bygger — en bundle vid registrets gränser är ~68 MB base64, och taket på två samtidiga anrop släpper in två sådana — och `postgres` 512m.
 
 Når `backend` inte `render` — nere, omstartande eller långsammare än tidsbudgeten — svarar `/api/render` `502 render_unavailable`. Tidsbudgeten summerar under proxyns tak: `xelatex` två gånger à 60 s, klienten mot `render` som mest 165 s, Caddys `response_header_timeout` 180 s.
 
