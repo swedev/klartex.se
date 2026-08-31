@@ -1,20 +1,72 @@
 # klartex.se production stack.
 # Deployed to ~klartex/klartex/docker-compose.yml on the Hetzner server.
-# Pinned version comes from .env (BACKEND_VERSION); never use :latest in prod.
+# Pinned versions come from .env; never use :latest in prod.
+#
+# Resource budget: the host is a cax11 (2 vCPU, 4 GB), and every cap below
+# is a ceiling rather than a reservation. The memory ceilings sum to 2560m,
+# leaving ~1.5 GB for the OS, Docker and Caddy. render carries the bulk of
+# it because it is the only service that compiles; backend's 768m covers
+# two bundle payloads in flight (~68 MB of base64 each, plus the JSON
+# copies of them), which its in-flight cap of 2 is what bounds. The CPU
+# quotas sum to the host's 2 vCPU, and backend barely uses its share, so
+# Caddy competes with render in practice.
+# memswap_limit == mem_limit disables swap throughout: a render that blows
+# its cap is OOM-killed rather than thrashing the disk.
 
 services:
+  render:
+    # The klartex core's own artifact, built and published by swedev/klartex
+    # at every release. Nothing in this repo builds it, and KLARTEX_VERSION
+    # is not a version series of its own: it is the `klartex==` pin from
+    # backend/pyproject.toml, which ci.yml checks against .env.example and
+    # every backend deploy writes to .env.
+    image: ghcr.io/swedev/klartex-render:${KLARTEX_VERSION:?set KLARTEX_VERSION in .env — see infra/README.md}
+    container_name: klartex-render
+    restart: unless-stopped
+    cpus: "1.5"
+    mem_limit: 1792m
+    memswap_limit: 1792m
+    pids_limit: 256
+    # No ports, no volumes, no environment: this is the process that runs
+    # caller-controlled LaTeX, and it is reachable only from backend over
+    # an internal network with no route out.
+    networks:
+      - render
+    # Hardening on top of that. read_only leaves the container without a
+    # writable rootfs, so /tmp (per-request asset directories) and HOME
+    # (fontconfig's cache) are tmpfs; without a writable HOME fontconfig
+    # logs "No writable cache directories" on every run.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+      - /home/render:size=64m,mode=1777
+    healthcheck:
+      # The same probe the image bakes in — a healthcheck: block here
+      # overrides it, and the base carries no curl.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   backend:
     image: ghcr.io/swedev/klartex-se-backend:${BACKEND_VERSION}
     container_name: klartex-se-backend
     restart: unless-stopped
-    # Resource caps for the render workload. The host is a cax11
-    # (2 vCPU, 4 GB), so OS + Caddy keep ~1.5 GB and half a core.
-    # memswap_limit == mem_limit disables swap: a render that blows the
-    # cap is OOM-killed rather than thrashing the disk.
-    cpus: "1.5"
-    mem_limit: 2560m
-    memswap_limit: 2560m
-    pids_limit: 256
+    cpus: "0.5"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    depends_on:
+      render:
+        condition: service_healthy
+    networks:
+      - default
+      - render
     # Bind to loopback only — Caddy is the public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
@@ -23,12 +75,17 @@ services:
       # page-template writes answer 503. Set: the token unlocks both.
       API_TOKEN: ${API_TOKEN:-}
       PAGE_TEMPLATES_DIR: /data/page-templates
+      # The default the image already carries; spelled out because it is
+      # the one line that says where compilation happens.
+      RENDER_URL: http://render:8000
     volumes:
       # Persistent storage for uploaded page-template bundles.
       # Lives outside the container so docker compose pull doesn't wipe them.
       - ./page-templates:/data/page-templates
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      # A healthcheck here overrides the image's, so it has to be the same
+      # probe: the backend runs on python:3.12-slim, which has no curl.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -54,3 +111,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  default:
+  # No gateway: a process here can reach backend and nothing else. It is
+  # the one thing that keeps caller-controlled LaTeX from reaching the
+  # internet, whatever it manages to read inside its own container.
+  render:
+    internal: true

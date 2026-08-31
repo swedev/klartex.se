@@ -109,6 +109,50 @@ def get_bundle_path(name: str) -> Path:
     return d
 
 
+def load_bundle_payload(name: str) -> tuple[str, dict[str, str]]:
+    """Return a bundle as (template source, assets as base64 by filename).
+
+    This is the form the render service takes: it has no volume and no
+    knowledge of the registry, so a bundle travels inline with the call.
+
+    Raises PageTemplateNotFound when the bundle is gone — it can disappear
+    between a lookup and this read — and PageTemplateError when it is
+    there but unusable: a template source that is not UTF-8, or an asset
+    the metadata lists but disk does not have. Those describe a broken
+    bundle rather than a broken call, but the caller can only report them
+    to whoever asked for it.
+    """
+    d = get_bundle_path(name)
+
+    try:
+        source = (d / TEMPLATE_FILENAME).read_text(encoding="utf-8")
+    except FileNotFoundError as e:
+        raise PageTemplateNotFound(name) from e
+    except UnicodeDecodeError as e:
+        raise PageTemplateError(
+            f"Page template {name!r}: {TEMPLATE_FILENAME} is not valid UTF-8"
+        ) from e
+
+    assets: dict[str, str] = {}
+    for filename in _load_metadata(d).get("asset_names") or []:
+        # save_bundle enforces this on the way in; enforced again on the way
+        # out so a metadata file edited on disk cannot turn a listed asset
+        # name into a path that leaves the bundle.
+        if not ASSET_NAME_RE.match(filename):
+            raise PageTemplateError(
+                f"Page template {name!r}: invalid asset filename {filename!r}"
+            )
+        try:
+            raw = (d / filename).read_bytes()
+        except OSError as e:
+            raise PageTemplateError(
+                f"Page template {name!r}: asset {filename!r} is missing"
+            ) from e
+        assets[filename] = base64.b64encode(raw).decode()
+
+    return source, assets
+
+
 def save_bundle(
     name: str,
     template_b64: str,
