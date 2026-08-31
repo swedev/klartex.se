@@ -122,6 +122,22 @@ services:
       # current` / `alembic upgrade head` runs read, so preflight, migration
       # and the serving process can never reach different databases.
       DATABASE_URL: postgresql://klartex:${POSTGRES_PASSWORD}@postgres:5432/klartex
+      # The HMAC key over sign-in codes. Required, and required here rather
+      # than defaulted, because a process that starts without it would mint
+      # codes that no restart and no second worker can verify.
+      LOGIN_CODE_SECRET: ${LOGIN_CODE_SECRET:?set LOGIN_CODE_SECRET in .env — see infra/README.md}
+      # The public origin: the session cookie's Secure flag and the
+      # same-origin test on the auth endpoints both read it.
+      BASE_URL: ${BASE_URL:-https://app.klartex.se}
+      # The only account state that is configuration rather than a row.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Sign-in codes are mailed; without SMTP nobody can sign in.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-kontakt@klartex.se}
       PAGE_TEMPLATES_DIR: /data/page-templates
       # The default the image already carries; spelled out because it is
       # the one line that says where compilation happens.

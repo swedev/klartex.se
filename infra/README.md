@@ -11,7 +11,7 @@ Filer som beskriver hur klartex.se-stacken provisioneras och deployas på en Het
 | `docker-compose.yml` | Stackdefinition: Caddy + backend + render + postgres. Deployas till `~/klartex/` på servern. |
 | `Caddyfile` | TLS + två vhosts: `klartex.se` och `app.klartex.se`, som servar både webbappen och `/api`. Rate limit + body-gräns på `POST /api/render`. |
 | `caddy/Dockerfile` | Caddy-image med rate limit-modulen, byggd på servern. |
-| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION` och `KLARTEX_VERSION`, bär `POSTGRES_PASSWORD`; `API_TOKEN` är valfri. |
+| `.env.example` | Mall för `infra/.env` på servern — pinnar `BACKEND_VERSION` och `KLARTEX_VERSION`, bär `POSTGRES_PASSWORD`, `LOGIN_CODE_SECRET` och SMTP-uppgifterna; `API_TOKEN` är valfri. |
 | `../.github/workflows/deploy.yml` | Deployar vid en `v*`-tagg: syncar infra + statiska filer, bygger Caddy, preflightar, migrerar, restartar. |
 
 Stacken har fyra containrar. `caddy` är publik entrypoint; `backend` (`../backend/`) lyssnar på loopback och bär `/api` — policy, discovery och sidmallsregistret; `render` kompilerar LaTeX åt `backend` och är nåbar enbart från den på ett internt compose-nätverk; `postgres` bär konton och parkopplingar och publicerar ingen port alls. `backend` startar först när både `render` och `postgres` är `healthy`.
@@ -30,11 +30,13 @@ Förutsätter att `hcloud` CLI är autentiserad och SSH-nyckeln uppladdad (se kl
 #    klartex.se / www / app  →  A-record
 
 # 3. Lägg env-filen på servern. Den görs en gång för hand och versionshanteras
-#    aldrig — den bär POSTGRES_PASSWORD och API_TOKEN. Deployen läser den,
-#    men rör aldrig annat än BACKEND_VERSION- och KLARTEX_VERSION-raderna.
-#    POSTGRES_PASSWORD måste vara satt: deployen stannar innan den rör något
-#    om raden saknas, och lösenordet går inte att ändra i efterhand utan att
-#    databasen låses ute (det sätts en gång, när volymen initieras).
+#    aldrig — den bär POSTGRES_PASSWORD, LOGIN_CODE_SECRET, SMTP-uppgifterna
+#    och API_TOKEN. Deployen läser den, men rör aldrig annat än
+#    BACKEND_VERSION- och KLARTEX_VERSION-raderna.
+#    POSTGRES_PASSWORD och LOGIN_CODE_SECRET måste vara satta: deployen
+#    stannar innan den rör något om någon av raderna saknas. Lösenordet går
+#    inte att ändra i efterhand utan att databasen låses ute (det sätts en
+#    gång, när volymen initieras).
 scp infra/.env.example klartex@<ip>:klartex/.env
 ssh -t klartex@<ip> "nano ~/klartex/.env"
 
@@ -71,6 +73,25 @@ Kör compose-filen mot en `.env` som saknar `KLARTEX_VERSION` stannar `docker co
 ### `API_TOKEN` i `.env` är valfri
 
 Osatt är det mest stängda läget: vanlig rendering och discovery är öppna, `latex`-blocket svarar `403` för alla och skrivningar mot page-templates `503`. Satt låser tokenen upp båda för den som skickar den. Ingen token behöver alltså finnas på servern för att deploya — parkoppling via parla (#19) ersätter den delade tokenen, och `ADMIN_TOKEN` från `v0.4.x` kan ligga kvar eller tas bort utan att något händer.
+
+## Konton och inloggning
+
+Inloggning är e-postadress plus en sexsiffrig engångskod. Vem som helst med en fungerande brevlåda kan skaffa ett konto — det är själva poängen: en anropare ska kunna ta sig en API-token utan att någon räcker över den. Första inloggningen skapar användaren och en en-persons-organisation för den.
+
+Fyra rader i `.env` styr det:
+
+| Nyckel | Krav | Vad den gör |
+|--------|------|-------------|
+| `LOGIN_CODE_SECRET` | **Obligatorisk** | HMAC-nyckel över koderna. Backenden vägrar starta utan den, och deployen stannar innan den rör något om raden saknas. |
+| `BASE_URL` | Default `https://app.klartex.se` | Avgör sessionskakans `Secure`-flagga och vilken `Origin` som räknas som samma ursprung. |
+| `ADMIN_EMAILS` | Valfri | Kommaseparerade adresser som är administratörer. Enda kontotillståndet som är serverkonfiguration i stället för en databasrad — ingen registrering kan befordra sig själv. |
+| `SMTP_HOST` m.fl. | Krävs i praktiken | Koden mejlas; utan en nåbar SMTP-server kommer ingen in. |
+
+`LOGIN_CODE_SECRET` är en varaktig hemlighet: byts den slutar varje kod som redan ligger i någons inkorg att fungera. Det finns medvetet ingen per-process-fallback — en sådan skulle knäcka alla utestående koder vid omstart, och varje kod en worker mintat åt nästa. Generera med `openssl rand -base64 32`.
+
+Ingenting som går att spela upp lagras: koden ligger som HMAC med nyckeln ovan, sessionstoken som ren sha256. Utgångna koder och sessioner städas opportunistiskt av de publika endpointsen.
+
+`POST /api/auth/request-code` mejlar den adress som skickas in, vilken den än är. Backendens egen cooldown är per adress — den begränsar hur ofta en brevlåda kan mejlas, inte hur många brevlådor en anropare kan nå — så Caddy har en per-IP-zon (`auth_code_per_ip`, 20 per timme) ovanpå.
 
 ## Databas, migrationer och dumpar
 
@@ -128,7 +149,9 @@ Startar den nya Caddyn trots preflight inte: ta bort `build:` och sätt tillbaka
 
 ## Rate limit och storleksgräns på `/api/render`
 
-`POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
+`POST /api/render` är begränsat i Caddy till 10 anrop per minut och klient-IP (IPv6 buckets per `/64`), och request-bodyn kapas vid 2 MB med `413`. Caddy sitter direkt mot internet utan `trusted_proxies`, så `X-Forwarded-For` kan inte kringgå taket.
+
+Den andra zonen är `POST /api/auth/request-code` — 20 per timme och klient-IP, av skäl som står under [Konton och inloggning](#konton-och-inloggning). Övriga endpoints — inklusive `/api/page-templates`, vars bundles legitimt kan vara stora — är orörda.
 
 `render` har dessutom ett tak på två samtidiga kompileringar (503 + `Retry-After`), och `backend` håller ett lika stort tak på anrop i luften dit. Alla tre containrarna kör med `cpus`, `mem_limit`, `memswap_limit` och `pids_limit` satta i `docker-compose.yml`; resursbudgeten för en cax11 (2 vCPU, 4 GB) står i kommentaren överst i den filen. `render` bär huvuddelen av minnestaket eftersom det är den som kompilerar; `backend` har 768m för de bundle-payloads den bygger — en bundle vid registrets gränser är ~68 MB base64, och taket på två samtidiga anrop släpper in två sådana — och `postgres` 512m.
 

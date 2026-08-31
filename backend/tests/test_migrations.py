@@ -23,6 +23,10 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from sqlalchemy import create_engine, inspect
+
+from klartex_se.db import sqlalchemy_url
+from klartex_se.models import Base
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -99,6 +103,31 @@ def test_downgrade_and_upgrade_again(empty_database):
 def test_current_resolves_before_the_first_migration(empty_database):
     """The deploy preflight answers against a database with no history."""
     assert revisions(alembic("current")) == []
+
+
+def test_models_match_head(empty_database):
+    """models.py describes the schema the migrations actually build.
+
+    The DDL is hand-written and the classes are written beside it, so
+    nothing keeps the two in step on its own. A column added to one and
+    forgotten in the other surfaces here rather than as an error on the
+    first query after a deploy.
+    """
+    alembic("upgrade", "head")
+    engine = create_engine(sqlalchemy_url())
+    try:
+        inspector = inspect(engine)
+        for table in Base.metadata.sorted_tables:
+            missing = f"{table.name} is not in the database"
+            assert inspector.has_table(table.name), missing
+            actual = {c["name"]: c for c in inspector.get_columns(table.name)}
+            assert set(actual) == {c.name for c in table.columns}, table.name
+            for column in table.columns:
+                assert actual[column.name]["nullable"] == column.nullable, (
+                    f"{table.name}.{column.name} disagrees on nullability"
+                )
+    finally:
+        engine.dispose()
 
 
 def test_single_head():

@@ -11,6 +11,10 @@ Här kompileras ingenting. `POST /api/render` avgör vad anroparen får göra, l
 | Metod & path | Vad | Token |
 |--------------|-----|-------|
 | `GET /api/health` | Liveness — används av Docker healthcheck | Nej |
+| `POST /api/auth/request-code` | Mejla en sexsiffrig engångskod till en adress | Nej |
+| `POST /api/auth/code` | Lös in koden och få en sessionskaka | Nej |
+| `POST /api/auth/logout` | Släng sessionen | Nej |
+| `GET /api/me` | Vem anroparen är inloggad som | Sessionskaka |
 | `GET /api/templates` | Lista mallar (block-engine + recipe) | Nej |
 | `GET /api/templates/{name}/schema` | JSON Schema för en mall | Nej |
 | `GET /api/blocks` | Lista block-engine-blocktyper | Nej |
@@ -39,6 +43,34 @@ En token låser upp *blockytan*, inte en högre kvot: Caddys tak på 10 anrop pe
 Ett presenterat men felaktigt token ger `401` även på `/api/render` — anropet degraderas inte tyst till anonymt, så en trasig integration går att skilja från ett avsiktligt anonymt anrop. Saknas `API_TOKEN` på instansen svarar varje anrop som presenterar en token `503`; de anonyma vägarna fungerar ändå.
 
 Tokenen är ett stopgap: en enda hemlighet som ger full åtkomst till alla bundles. Konton och self-serve-tokens är #19. Åtkomst ges på förfrågan tills dess — mejla kontakt@klartex.se.
+
+## Konton och inloggning
+
+Inloggning är e-postadress plus en sexsiffrig engångskod, och ingenting annat. En magisk länk skulle dra in problemet med mejlskannrar — ett `GET` som inte får förbruka inloggningen — utan att ge något: koden skrivs in i samma vy som bad om den, så klienten behöver inget eget tillstånd mellan de två stegen.
+
+Det finns ingen allowlist. Vem som helst med en fungerande brevlåda kan logga in, och första inloggningen skapar användaren plus en en-persons-organisation för den. Organisationen är det parkopplade maskiner kommer att höra till.
+
+```bash
+curl -X POST http://localhost:8000/api/auth/request-code \
+  -H 'Content-Type: application/json' -d '{"email":"du@example.com"}'
+
+curl -X POST http://localhost:8000/api/auth/code -c cookies.txt \
+  -H 'Content-Type: application/json' -d '{"email":"du@example.com","code":"123456"}'
+
+curl -b cookies.txt http://localhost:8000/api/me
+```
+
+Tre egenskaper håller ihop flödet:
+
+- **Enumeration-säkerhet.** `request-code` svarar likadant för en adress som har konto, en som inte har det, och en som fortfarande ligger inne i sin cooldown på 60 sekunder. Inlösen svarar likadant för fel, förbrukad, utgången och slutförsökt kod.
+- **Ingenting uppspelningsbart lagras.** Koden ligger som HMAC nycklad med `LOGIN_CODE_SECRET`, som aldrig når databasen; sessionstoken som ren sha256.
+- **Kapplöpningar kan inte dubbelspendera.** En guardad `UPDATE` förbrukar koden, och begäransvägen serialiserar per adress på ett `pg_advisory_xact_lock`, så två samtidiga anrop inte kan lämna två levande koder efter sig.
+
+En kod gäller i 15 minuter och dör efter fem felaktiga försök. Sessionen gäller i 30 dagar och bärs av kakan `klartex_session` (`httponly`, `samesite=lax`, `secure` när `BASE_URL` är https). Alla auth-svar bär `Cache-Control: no-store`.
+
+Skrivningar med kaka kontrollerar `Origin` mot `BASE_URL`. En helt frånvarande `Origin` passerar — curl och agenter skickar ingen, och de är förstahandsanropare här.
+
+`LOGIN_CODE_SECRET` är obligatorisk: appen vägrar starta utan den. En fallback per process skulle se ut att fungera medan den tyst knäckte varje utestående kod vid omstart, och varje kod en worker mintat åt nästa. Administratörer räknas ut ur `ADMIN_EMAILS` i stället för att vara en kolumn, så ingen registrering kan befordra sig själv.
 
 ## Felsvar från `/api/render`
 
@@ -145,8 +177,14 @@ pip install -e ".[dev]"
 # Render-tjänsten, i ett eget skal. Kräver xelatex på PATH.
 klartex serve --port 8001
 
-# Appen, pekad på den
-RENDER_URL=http://localhost:8001 uvicorn klartex_se.main:app --reload --port 8000
+# Appen, pekad på den. LOGIN_CODE_SECRET är obligatorisk — utan den startar
+# den inte. BASE_URL styr sessionskakans Secure-flagga, så lokalt över http
+# måste den vara http:// eller kakan aldrig skickas tillbaka.
+RENDER_URL=http://localhost:8001 \
+LOGIN_CODE_SECRET=dev-secret \
+BASE_URL=http://localhost:8000 \
+DATABASE_URL=postgresql://klartex:klartex@localhost:5432/klartex \
+  uvicorn klartex_se.main:app --reload --port 8000
 
 # Smoke-test
 curl http://localhost:8000/api/templates | jq '.[].name'
@@ -160,13 +198,16 @@ Utan `klartex serve` igång svarar `/api/render` `502 render_unavailable`; disco
 
 Tester behöver ingen render-tjänst: enhetstesterna ersätter proxy-anropet, och `tests/test_contract.py` driver `klartex.server` i samma process. `xelatex` behövs bara för de två testerna som renderar på riktigt, och de hoppas över när det saknas. Samma pytest-svit körs i CI före image-bygget.
 
-`tests/test_migrations.py` kör mot en riktig Postgres och hoppas över när `DATABASE_URL` är osatt eller pekar på något onåbart. Sviten är destruktiv — varje test börjar från ett tomt `public`-schema — så peka den på en slaskdatabas, aldrig på en med riktiga rader. CI ger den en engångs-servicecontainer.
+`tests/test_migrations.py` och `tests/test_accounts.py` kör mot en riktig Postgres och hoppas över när `DATABASE_URL` är osatt eller pekar på något onåbart. Bägge är destruktiva — migrationssviten börjar varje test från ett tomt `public`-schema, kontosviten tömmer kontotabellerna — så peka dem på en slaskdatabas, aldrig på en med riktiga rader. CI ger dem en engångs-servicecontainer.
+
+`tests/conftest.py` sätter `LOGIN_CODE_SECRET` och `BASE_URL` innan appen importeras: utan den första går appen inte att importera alls, och utan den andra skulle sessionskakan bli `Secure` och aldrig skickas tillbaka över testklientens `http://testserver`.
 
 ```bash
 pytest
 pytest -k "not render"   # bara discovery-tester (snabbt, ingen xelatex)
 
-DATABASE_URL=postgresql://klartex:klartex@localhost:5432/klartex pytest tests/test_migrations.py
+DATABASE_URL=postgresql://klartex:klartex@localhost:5432/klartex \
+  pytest tests/test_migrations.py tests/test_accounts.py
 ```
 
 ## Docker

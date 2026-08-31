@@ -151,8 +151,11 @@ jobs:
             smoke-test:amd64 alembic upgrade head
           echo "✓ migrations applied from the release image"
 
+          # LOGIN_CODE_SECRET is required to start at all: without it the
+          # backend would mint sign-in codes that no restart and no second
+          # worker could verify, so it refuses rather than pretending.
           docker run -d --name smoke --network smoke-net -p 18000:8000 \
-            -e DATABASE_URL="$DB_URL" smoke-test:amd64
+            -e DATABASE_URL="$DB_URL" -e LOGIN_CODE_SECRET=smoke smoke-test:amd64
 
           up=0
           for i in $(seq 1 60); do
@@ -180,6 +183,16 @@ jobs:
             dump_logs; exit 1
           fi
           echo "✓ both services on klartex $backend_core"
+
+          # The account routes are mounted and reach the migrated database.
+          # No SMTP here, so this stops at the unauthenticated answer —
+          # enough to catch a router that never made it into the image.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18000/api/me)
+          if [ "$code" != "401" ]; then
+            echo "/api/me without a session answered HTTP $code, expected 401"
+            dump_logs; exit 1
+          fi
+          echo "✓ /api/me answers 401 without a session"
 
           # The anonymous tier may not send raw LaTeX. A 403 here is the
           # policy layer answering before anything reaches the compiler.
@@ -286,6 +299,10 @@ jobs:
              fi
              if ! grep -q "^POSTGRES_PASSWORD=." /home/klartex/klartex/.env; then
                echo "POSTGRES_PASSWORD is missing from /home/klartex/klartex/.env — the database needs it, see infra/README.md" >&2
+               exit 1
+             fi
+             if ! grep -q "^LOGIN_CODE_SECRET=." /home/klartex/klartex/.env; then
+               echo "LOGIN_CODE_SECRET is missing from /home/klartex/klartex/.env — the backend refuses to start without it, see infra/README.md" >&2
                exit 1
              fi
              umask 022; mkdir -p /home/klartex/deploy-backup
