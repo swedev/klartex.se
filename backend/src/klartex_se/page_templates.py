@@ -14,22 +14,23 @@ leading dots.
 
 Asset resolution
 ----------------
-The bundle directory is handed to `klartex.render(asset_dir=...)`, which
-puts it on TEXINPUTS and runs xelatex with it as cwd. Two reference forms
-behave differently inside the .tex.jinja:
+Nothing here compiles. `load_bundle_payload` reads a bundle into a source
+string plus base64 assets, and the render service writes those to a
+temporary directory of its own, which it puts on TEXINPUTS and runs
+xelatex in. The directory a template's references resolve against is
+therefore a copy, never this one. Two reference forms behave differently
+inside the .tex.jinja:
 
 * Bare filename (`\includegraphics{logo.pdf}`) — resolved via TEXINPUTS:
-  the bundle directory first, the server process cwd as fallback.
+  the bundle's files first, the render process cwd as fallback.
 * Explicit relative (`\includegraphics{./logo.pdf}`) — Kpathsea never
-  consults TEXINPUTS for these, so it resolves against the bundle
-  directory only, with no cwd fallback.
+  consults TEXINPUTS for these, so it resolves against the bundle's files
+  only, with no cwd fallback.
 
-When a name exists both in the bundle and in the process cwd, the
-bundle's copy wins. Parent-relative references are out of contract:
-asset filenames carry no path separators, so no bundle can create that
-layout through the API, and such a reference escapes the bundle —
-`../shared.tex` lands in the registry root, `../other/logo.pdf` in
-another bundle.
+When a name exists both in the bundle and in the render process cwd, the
+bundle's copy wins. Parent-relative references are out of contract: asset
+filenames carry no path separators, so no bundle can create that layout
+through the API, and the render service rejects such a name outright.
 
 Forward-compat note: once orgs+auth land (fas 5), this layout migrates to
 /data/orgs/<org>/page-templates/<name>/. The same internal API stays.
@@ -102,7 +103,12 @@ def get_bundle(name: str) -> dict:
 
 
 def get_bundle_path(name: str) -> Path:
-    """Return the directory path. Caller uses this with klartex(asset_dir=)."""
+    """Return the directory path, proving the bundle exists.
+
+    The render endpoint calls this to settle existence as policy — an
+    unregistered name is a 400 — before `load_bundle_payload` reads the
+    contents inside the in-flight semaphore.
+    """
     d = _bundle_dir(name)
     if not d.exists() or not (d / METADATA_FILENAME).exists():
         raise PageTemplateNotFound(name)
@@ -117,10 +123,10 @@ def load_bundle_payload(name: str) -> tuple[str, dict[str, str]]:
 
     Raises PageTemplateNotFound when the bundle is gone — it can disappear
     between a lookup and this read — and PageTemplateError when it is
-    there but unusable: a template source that is not UTF-8, or an asset
-    the metadata lists but disk does not have. Those describe a broken
-    bundle rather than a broken call, but the caller can only report them
-    to whoever asked for it.
+    there but unusable: a template source that is not UTF-8, metadata that
+    is not readable JSON, or an asset the metadata lists but disk does not
+    have. Those describe a broken bundle rather than a broken call, but the
+    caller can only report them to whoever asked for it.
     """
     d = get_bundle_path(name)
 
@@ -133,8 +139,20 @@ def load_bundle_payload(name: str) -> tuple[str, dict[str, str]]:
             f"Page template {name!r}: {TEMPLATE_FILENAME} is not valid UTF-8"
         ) from e
 
+    try:
+        metadata = _load_metadata(d)
+    except FileNotFoundError as e:
+        # Deleted between get_bundle_path and here.
+        raise PageTemplateNotFound(name) from e
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        # Not JSON, not UTF-8, or unreadable — all the same on-disk damage
+        # the asset-name check below also guards against.
+        raise PageTemplateError(
+            f"Page template {name!r}: {METADATA_FILENAME} is unreadable"
+        ) from e
+
     assets: dict[str, str] = {}
-    for filename in _load_metadata(d).get("asset_names") or []:
+    for filename in metadata.get("asset_names") or []:
         # save_bundle enforces this on the way in; enforced again on the way
         # out so a metadata file edited on disk cannot turn a listed asset
         # name into a path that leaves the bundle.

@@ -16,6 +16,12 @@ HTTP response:
   client is told only that the service did not answer, without the internal
   hostname.
 
+A 200 counts as an answer only when the body actually opens with `%PDF`.
+An intermediary that answers a POST with its own 200 — a captive portal, a
+login page, an ingress error rendered as HTML — is otherwise indistinguishable
+from the renderer here, and the bytes would reach the caller labelled
+`application/pdf`.
+
 The time budget is explicit and has to stay under the proxy's. The core
 runs xelatex twice with a 60 s timeout each, so a legitimate render can take
 two minutes: connect 5 + write 30 + read 130 is 165 s worst case, and Caddy
@@ -130,7 +136,10 @@ def render_pdf(
         log.warning("render service unreachable: %s: %s", type(e).__name__, e)
         raise RenderUpstreamError(502, dict(UNAVAILABLE_DETAIL)) from e
 
-    if response.status_code == 200:
+    # A truncated PDF still opens with the signature, so this does not
+    # promise a readable document — it separates a render from an answer
+    # that never came from a renderer at all.
+    if response.status_code == 200 and response.content[:4] == b"%PDF":
         return response.content
 
     if response.status_code in PASSTHROUGH_STATUSES:
@@ -145,8 +154,9 @@ def render_pdf(
             )
 
     log.warning(
-        "unusable answer from the render service: HTTP %s: %.200s",
+        "unusable answer from the render service: HTTP %s (%s): %.200s",
         response.status_code,
+        response.headers.get("Content-Type", "no content type"),
         response.text,
     )
     raise RenderUpstreamError(502, dict(UNAVAILABLE_DETAIL))

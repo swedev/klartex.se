@@ -78,6 +78,41 @@ def test_a_call_without_a_bundle_sends_null_and_an_empty_map(upstream):
     assert body["assets"] == {}
 
 
+@pytest.mark.parametrize(
+    "handler",
+    [
+        answering(200, html="<html>Sign in to continue</html>"),
+        answering(200, json={"detail": {"type": "input_error", "message": "no"}}),
+        answering(200, content=b""),
+        answering(200, content=b"PDF-1.7 without the percent"),
+    ],
+    ids=["html", "json", "empty", "near-miss"],
+)
+def test_a_200_that_is_not_a_pdf_becomes_502(upstream, handler):
+    """Only a body that opens with %PDF counts as a render.
+
+    An intermediary can answer a POST with its own 200 — a captive portal,
+    a login page, an ingress error page. Forwarding that as
+    `application/pdf` would hand the caller a corrupt download instead of
+    an error it can act on.
+    """
+    upstream(handler)
+
+    with pytest.raises(RenderUpstreamError) as excinfo:
+        render_pdf("_block", {})
+
+    assert_unavailable(excinfo)
+
+
+def test_a_200_pdf_is_returned_whatever_the_content_type(upstream):
+    """The signature decides, not a header an intermediary may rewrite."""
+    upstream(answering(200, content=b"%PDF-1.7 ...", headers={
+        "Content-Type": "application/octet-stream"
+    }))
+
+    assert render_pdf("_block", {}) == b"%PDF-1.7 ..."
+
+
 @pytest.mark.parametrize("status", [400, 500, 503])
 def test_documented_statuses_pass_through(upstream, status):
     detail = {"type": "input_error", "message": "no", "path": ["body", 1]}

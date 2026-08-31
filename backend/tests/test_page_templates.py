@@ -181,6 +181,32 @@ def test_load_bundle_payload_reports_a_deleted_bundle_as_not_found():
         pt.load_bundle_payload("never-registered")
 
 
+def test_load_bundle_payload_rejects_unreadable_metadata(tmp_path):
+    """Metadata edited into invalid JSON is a broken bundle, not a 500.
+
+    get_bundle_path only proves the file exists, so this is the first read
+    that parses it.
+    """
+    pt.save_bundle("vkf", b64("x"), {})
+    (tmp_path / "vkf" / pt.METADATA_FILENAME).write_text("{not json")
+
+    with pytest.raises(pt.PageTemplateError, match=pt.METADATA_FILENAME):
+        pt.load_bundle_payload("vkf")
+
+
+def test_load_bundle_payload_reports_metadata_vanishing_as_not_found(monkeypatch):
+    """Deleted between the existence check and the metadata read."""
+    pt.save_bundle("vkf", b64("x"), {})
+
+    def vanished(bundle_dir):
+        raise FileNotFoundError(bundle_dir / pt.METADATA_FILENAME)
+
+    monkeypatch.setattr(pt, "_load_metadata", vanished)
+
+    with pytest.raises(pt.PageTemplateNotFound):
+        pt.load_bundle_payload("vkf")
+
+
 # --- HTTP routes ------------------------------------------------------------
 
 def test_list_empty(client):
