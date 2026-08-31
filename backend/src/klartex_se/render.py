@@ -237,6 +237,11 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
             get_bundle_path(req.page_template)
         except PageTemplateNotFound as e:
             raise _unknown_page_template(req.page_template) from e
+        except PageTemplateError as e:
+            raise HTTPException(
+                400,
+                detail={"type": "input_error", "message": str(e)},
+            ) from e
         bundle = req.page_template
         # A bundle carries one whole-page source, which klartex takes as the
         # header slot; emptying the footer keeps the emission identical to a
