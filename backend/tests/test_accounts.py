@@ -14,6 +14,7 @@ written down.
 """
 
 import os
+import ssl
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -364,6 +365,60 @@ def test_a_same_origin_write_passes(client, mailbox):
         ).status_code
         == 200
     )
+
+
+def test_a_malformed_origin_is_rejected_rather_than_crashing(client):
+    """A port is parsed on access, and an unguarded parse would be a 500.
+
+    The contract for a bad Origin is the same 403 a mismatched one gets;
+    answering 500 instead would turn every cookie-write endpoint into a
+    crash for anyone who sends a junk header.
+    """
+    rejected = client.post(
+        "/api/auth/request-code",
+        json={"email": EMAIL},
+        headers={"Origin": "http://x:abc"},
+    )
+    assert rejected.status_code == 403
+
+
+def test_the_sign_in_mail_verifies_the_smtp_server(monkeypatch):
+    """STARTTLS without an explicit context verifies nothing.
+
+    The context `starttls()` falls back to sets CERT_NONE and skips the
+    hostname check, so anyone in the path could impersonate the SMTP
+    server and read the credentials and every code that crosses it.
+    """
+    contexts = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def starttls(self, context=None):
+            contexts.append(context)
+
+        def login(self, user, password):
+            pass
+
+        def send_message(self, message):
+            pass
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_TLS", "true")
+    monkeypatch.setattr(accounts.smtplib, "SMTP", FakeSMTP)
+
+    accounts._send_code_email(EMAIL, "123456")
+
+    assert len(contexts) == 1
+    assert contexts[0].check_hostname is True
+    assert contexts[0].verify_mode == ssl.CERT_REQUIRED
 
 
 def test_a_missing_origin_passes(client, mailbox):

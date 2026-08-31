@@ -34,6 +34,7 @@ import hmac
 import os
 import secrets
 import smtplib
+import ssl
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Literal
@@ -129,9 +130,12 @@ def _code_hash(code: str) -> str:
 def _origin_parts(value: str) -> tuple[str, str | None, int | None] | None:
     try:
         parts = urlsplit(value)
+        # `.port` parses on access rather than in urlsplit, and raises on a
+        # non-numeric or out-of-range value, so it has to be read under the
+        # same guard: a malformed Origin is a rejection, not a crash.
+        port = parts.port or _DEFAULT_PORTS.get(parts.scheme)
     except ValueError:
         return None
-    port = parts.port or _DEFAULT_PORTS.get(parts.scheme)
     return (parts.scheme, parts.hostname, port)
 
 
@@ -185,7 +189,11 @@ def _send_code_email(to: str, code: str) -> None:
     port = int(os.environ.get("SMTP_PORT", "587"))
     with smtplib.SMTP(host, port, timeout=15) as smtp:
         if os.environ.get("SMTP_TLS", "true").lower() == "true":
-            smtp.starttls()
+            # An explicit default context. The one starttls() builds for
+            # itself neither verifies the certificate nor checks the
+            # hostname, which would leave the SMTP credentials and every
+            # sign-in code readable to anyone in the network path.
+            smtp.starttls(context=ssl.create_default_context())
         user = os.environ.get("SMTP_USER", "")
         if user:
             smtp.login(user, os.environ.get("SMTP_PASSWORD", ""))
