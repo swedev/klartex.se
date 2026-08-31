@@ -17,6 +17,27 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The migration suite runs against the real dialect: parla's schema,
+    # `pg_advisory_xact_lock` and uuid keys are Postgres-only, so a suite
+    # that passed against SQLite would say nothing about production. The
+    # container is throwaway — tests/test_migrations.py drops and recreates
+    # the public schema.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: klartex
+          POSTGRES_PASSWORD: klartex
+          POSTGRES_DB: klartex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U klartex -d klartex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://klartex:klartex@localhost:5432/klartex
     steps:
       - uses: actions/checkout@v4
 
@@ -44,9 +65,10 @@ jobs:
 
       # xelatex is not installed here, so the tests that need it skip
       # themselves. Everything else — schema validation, error shapes, the
-      # in-flight cap, and the backend → render contract driven in-process
-      # against klartex.server — runs. The full render path is covered by
-      # the two-container smoke test in the release workflow.
+      # in-flight cap, the backend → render contract driven in-process
+      # against klartex.server, and the migrations against the service
+      # container above — runs. The full render path is covered by the
+      # two-container smoke test in the release workflow.
       - name: Run tests
         working-directory: ./backend
         run: |

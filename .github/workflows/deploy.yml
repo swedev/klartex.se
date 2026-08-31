@@ -8,6 +8,19 @@ name: Release
 # workflow_dispatch from a tag re-runs that release (rollback). The build is
 # reproducible from the tagged tree, so it produces the same image.
 #
+# Migrations are forward-only. The deploy runs preflight → stop → dump →
+# migrate → start: the new image resolves the running database's revision
+# while the old stack still serves, so a rollback across a migration fails
+# before production is taken down.
+#
+# That gate lives in the workflow definition, and Actions runs the
+# definition at the dispatched ref. Every tag from v0.7.0 — the first
+# database release — carries it; tags before v0.7.0 predate the database
+# entirely, so their stacks have no postgres service and never touch
+# pgdata. Rollback is therefore supported only to versions on the same
+# migration head: the preflight fails anything else — roll forward
+# instead. Same convention as timla / styrla. See infra/README.md.
+#
 # The frontend at app.klartex.se is not deployed here. ~/app is fed from
 # app/dist, and the source that builds it lives on the unmerged #14 branch
 # rather than on main, so a CI checkout has nothing to build. Once #14
@@ -99,23 +112,47 @@ jobs:
       # The backend compiles nothing, so it is smoke-tested against a real
       # render service — the same image and version the deploy will pull.
       # Alone it could only prove that it can answer 502.
-      - name: Smoke-test (the whole chain, in two containers)
+      - name: Smoke-test (the whole chain, in three containers)
         env:
           KLARTEX: ${{ steps.version.outputs.klartex }}
         run: |
           set -euo pipefail
 
+          DB_URL=postgresql://klartex:smoke@postgres:5432/klartex
+
           docker network create smoke-net
-          # Named `render` because that is the host the backend defaults to.
+          # Named `postgres` and `render` because those are the hosts the
+          # backend addresses in the compose stack.
+          docker run -d --name postgres --network smoke-net \
+            -e POSTGRES_USER=klartex -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=klartex \
+            postgres:18-alpine
           docker run -d --name render --network smoke-net \
             "ghcr.io/swedev/klartex-render:$KLARTEX"
-          docker run -d --name smoke --network smoke-net -p 18000:8000 \
-            smoke-test:amd64
 
           dump_logs() {
-            echo "--- backend logs ---"; docker logs smoke
-            echo "--- render logs ---"; docker logs render
+            echo "--- backend logs ---"; docker logs smoke 2>&1 || true
+            echo "--- render logs ---"; docker logs render 2>&1 || true
+            echo "--- postgres logs ---"; docker logs postgres 2>&1 || true
           }
+
+          db=0
+          for i in $(seq 1 60); do
+            if docker exec postgres pg_isready -U klartex -d klartex >/dev/null 2>&1; then
+              echo "✓ postgres up after ${i}s"; db=1; break
+            fi
+            sleep 1
+          done
+          [ "$db" = 1 ] || { echo "postgres never came up"; dump_logs; exit 1; }
+
+          # The image has to be able to migrate the database it will serve —
+          # the same `alembic upgrade head` the deploy runs on the server,
+          # against the same image, before anything is published.
+          docker run --rm --network smoke-net -e DATABASE_URL="$DB_URL" \
+            smoke-test:amd64 alembic upgrade head
+          echo "✓ migrations applied from the release image"
+
+          docker run -d --name smoke --network smoke-net -p 18000:8000 \
+            -e DATABASE_URL="$DB_URL" smoke-test:amd64
 
           up=0
           for i in $(seq 1 60); do
@@ -170,7 +207,7 @@ jobs:
             echo "Response is not a PDF"; head -c 200 /tmp/out.pdf; exit 1;
           }
           echo "✓ render produced $(stat -c%s /tmp/out.pdf) bytes of PDF"
-          docker stop smoke render
+          docker stop smoke render postgres
 
       # Only after the smoke test passes does anything reach the registry.
       - uses: docker/build-push-action@v6
@@ -247,6 +284,10 @@ jobs:
                echo "/home/klartex/klartex/.env is missing — create it on the server once, see infra/README.md" >&2
                exit 1
              fi
+             if ! grep -q "^POSTGRES_PASSWORD=." /home/klartex/klartex/.env; then
+               echo "POSTGRES_PASSWORD is missing from /home/klartex/klartex/.env — the database needs it, see infra/README.md" >&2
+               exit 1
+             fi
              umask 022; mkdir -p /home/klartex/deploy-backup
              rm -rf /home/klartex/deploy-backup/*
              for f in docker-compose.yml Caddyfile .env; do
@@ -283,9 +324,29 @@ jobs:
           # exist yet.
           prev_caddy_image="$(docker image inspect --format '{{.Id}}' klartex-se-caddy:local 2>/dev/null || true)"
           restarted=0
+          # Set the moment `alembic upgrade head` succeeds. Past that point the
+          # database is at the new head, and starting the previous image again
+          # would itself be an unsupported rollback across a migration.
+          migrated=0
+          dump=""
 
           restore() {
               trap - ERR
+              if [[ "$migrated" == 1 ]]; then
+                  echo "✗ deploy failed AFTER the migration succeeded — the previous image is NOT being restored."
+                  echo "  The database is at the new head, and migrations are forward-only:"
+                  echo "  starting the old image against it is unsupported. The stack may be down."
+                  echo "  Roll forward with a fixed release, or restore the pre-migration dump:"
+                  echo "    cd /home/klartex/klartex"
+                  echo "    docker compose up -d postgres"
+                  echo "    docker compose exec -T postgres psql -U klartex -d klartex -v ON_ERROR_STOP=1 \\"
+                  echo "      -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'"
+                  echo "    gunzip -c $dump | docker compose exec -T postgres psql -U klartex -d klartex -v ON_ERROR_STOP=1"
+                  echo "  The schema reset is not optional: the dump drops only what it contains, and"
+                  echo "  a table the failed migration created is not in it."
+                  echo "  Dump: $dump — full procedure in infra/README.md."
+                  exit 1
+              fi
               echo "✗ deploy failed — restoring config from /home/klartex/deploy-backup"
               cp /home/klartex/deploy-backup/docker-compose.yml \
                  /home/klartex/deploy-backup/Caddyfile \
@@ -341,12 +402,50 @@ jobs:
           docker run --rm -v /home/klartex/klartex/Caddyfile:/etc/caddy/Caddyfile:ro klartex-se-caddy:local \
               caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+          # Migration preflight, while the old stack still serves. The NEW
+          # image resolves the running database's revision: an image that
+          # cannot (a rollback across a migration — unsupported, migrations
+          # are forward-only) fails HERE, before production is taken down.
+          # --name because the service sets container_name, which `run` would
+          # otherwise collide with against the running backend.
+          docker compose run --rm --name klartex-alembic-preflight backend alembic current
+
+          # stop → dump → migrate → start. Writers must be gone before the
+          # schema moves, and the dump is taken with them gone, so it is a
+          # consistent restore point for exactly the operation that can
+          # destroy data. From this line on, a failure needs the stack
+          # restarted to bring the backend back — up to the migration, the
+          # old image is still the right thing to start.
           restarted=1
+          docker compose stop backend
+
+          # Outside /home/klartex/klartex/ on purpose: that is the rsync
+          # target and --delete would remove anything inside it. umask 077
+          # because a dump is a full copy of the database.
+          #
+          # --clean --if-exists so the dump restores into the database it is
+          # restored into: the situation it exists for is a failed migration,
+          # where the schema has already moved on, and a plain restore would
+          # collide with every object that is already there.
+          mkdir -p /home/klartex/db-backups
+          dump="/home/klartex/db-backups/klartex-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+          ( umask 077
+            docker compose exec -T postgres pg_dump -U klartex -d klartex --clean --if-exists \
+              | gzip -c > "$dump" )
+          [[ -s "$dump" ]] || { echo "pg_dump produced an empty file" >&2; false; }
+          gzip -t "$dump"
+          echo "dump: $dump ($(stat -c%s "$dump") bytes)"
+          # Keep the five most recent; the database is small but the disk is not.
+          ls -1t /home/klartex/db-backups/klartex-*.sql.gz | tail -n +6 | xargs -r rm -f
+
+          docker compose run --rm --name klartex-alembic-upgrade backend alembic upgrade head
+          migrated=1
+
           sudo systemctl restart klartex-stack.service
           sleep 5
           docker compose ps
           running="$(docker compose ps --services --filter status=running)"
-          for svc in backend render caddy; do
+          for svc in postgres backend render caddy; do
               grep -qx "$svc" <<<"$running" || {
                   echo "service $svc is not running after restart"
                   false

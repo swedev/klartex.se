@@ -2,18 +2,60 @@
 # Deployed to ~klartex/klartex/docker-compose.yml on the Hetzner server.
 # Pinned versions come from .env; never use :latest in prod.
 #
-# Resource budget: the host is a cax11 (2 vCPU, 4 GB), and every cap below
-# is a ceiling rather than a reservation. The memory ceilings sum to 2560m,
-# leaving ~1.5 GB for the OS, Docker and Caddy. render carries the bulk of
-# it because it is the only service that compiles; backend's 768m covers
-# two bundle payloads in flight (~68 MB of base64 each, plus the JSON
-# copies of them), which its in-flight cap of 2 is what bounds. The CPU
-# quotas sum to the host's 2 vCPU, and backend barely uses its share, so
-# Caddy competes with render in practice.
+# Resource budget: the host is a cax11 (2 vCPU, 3.7 GiB usable), and every
+# cap below is a ceiling rather than a reservation. The memory ceilings sum
+# to 3072m, leaving ~700m for the OS, Docker and Caddy — comfortable in
+# practice, where the measured peaks are render 517m, backend 52m and caddy
+# 13m. render carries the bulk of the ceiling because it is the only
+# service that compiles; postgres holds accounts and pairings in 512m.
+#
+# backend keeps 768m because of the bundle path, not its idle footprint: a
+# bundle at the registry limits (MAX_ASSETS=10 x MAX_ASSET_BYTES=5 MB, plus
+# a 1 MB template) is ~68 MB once base64-encoded, and the decoded copy, the
+# encoded mapping and the serialized JSON body are all live at once. The
+# in-flight cap of 2 admits two of those concurrently, which is what sets
+# the ceiling. Lowering it means lowering MAX_ASSETS, MAX_ASSET_BYTES or
+# MAX_INFLIGHT_RENDERS first.
+#
+# The CPU quotas sum to 2.5 on 2 vCPU, so they are deliberately
+# oversubscribed: backend and postgres are idle whenever render is busy,
+# and capping them at a true share would only slow the paths that never
+# compete.
 # memswap_limit == mem_limit disables swap throughout: a render that blows
 # its cap is OOM-killed rather than thrashing the disk.
 
 services:
+  postgres:
+    # Accounts, sessions and parla's machines and grants. The family
+    # convention (styrla, tutti): pinned major, named volume, no published
+    # port — the database is reachable from backend on the compose network
+    # and nowhere else. Admin access is `docker compose exec postgres psql`.
+    image: postgres:18-alpine
+    container_name: klartex-postgres
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 256
+    environment:
+      POSTGRES_USER: klartex
+      POSTGRES_DB: klartex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see infra/README.md}
+    volumes:
+      # A named volume, not a bind mount, so an rsync of the deploy
+      # directory can never reach the data. PG18 expects the mount at
+      # /var/lib/postgresql with the data in a version-specific subdir.
+      # A volume is persistence, not a backup — the deploy dumps to
+      # /home/klartex/db-backups/ before every migration.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U klartex -d klartex"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - default
+
   render:
     # The klartex core's own artifact, built and published by swedev/klartex
     # at every release. Nothing in this repo builds it, and KLARTEX_VERSION
@@ -64,6 +106,8 @@ services:
     depends_on:
       render:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - default
       - render
@@ -74,6 +118,10 @@ services:
       # Optional. Unset: the latex block answers 403 for everyone and
       # page-template writes answer 503. Set: the token unlocks both.
       API_TOKEN: ${API_TOKEN:-}
+      # Accounts and pairings. The same variable the deploy's `alembic
+      # current` / `alembic upgrade head` runs read, so preflight, migration
+      # and the serving process can never reach different databases.
+      DATABASE_URL: postgresql://klartex:${POSTGRES_PASSWORD}@postgres:5432/klartex
       PAGE_TEMPLATES_DIR: /data/page-templates
       # The default the image already carries; spelled out because it is
       # the one line that says where compilation happens.
@@ -112,10 +160,14 @@ services:
       backend:
         condition: service_healthy
 
+volumes:
+  pgdata:
+
 networks:
   default:
   # No gateway: a process here can reach backend and nothing else. It is
   # the one thing that keeps caller-controlled LaTeX from reaching the
-  # internet, whatever it manages to read inside its own container.
+  # internet, whatever it manages to read inside its own container. The
+  # database is not on it, so no LaTeX run can address postgres at all.
   render:
     internal: true

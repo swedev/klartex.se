@@ -1,6 +1,6 @@
 [project]
 name = "klartex-se-backend"
-version = "0.6.0"
+version = "0.7.0"
 description = "HTTP backend for klartex.se — policy and discovery in front of the klartex render service"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,6 +9,9 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",
     "httpx>=0.27",       # the client that reaches the render service
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",     # the image runs `alembic upgrade head` on deploy
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]

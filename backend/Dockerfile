@@ -15,6 +15,14 @@ COPY src/ ./src/
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir .
 
+# The migration environment travels in the image, not just the source tree:
+# the deploy preflights with `docker compose run --rm backend alembic current`
+# and migrates with `alembic upgrade head`, both against the image that is
+# about to serve. WORKDIR is /app, where alembic.ini sits, so the bare
+# `alembic` command resolves its config without -c.
+COPY alembic.ini ./
+COPY migrations/ ./migrations/
+
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
