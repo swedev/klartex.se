@@ -144,6 +144,27 @@ def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch, fake_re
     assert fake_render == []
 
 
+@pytest.mark.parametrize("name", ["Formal", "a/b", "x_y", "-lead"])
+def test_render_malformed_page_template_name_returns_400(
+    name, tmp_path, monkeypatch, fake_render
+):
+    """A name the bundle-name pattern rejects is a client error, not a 500."""
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
+
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": name,
+        },
+    )
+
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["type"] == "input_error"
+    assert fake_render == []
+
+
 # --- Registered bundles: one source owning the header slot ------------------
 
 
