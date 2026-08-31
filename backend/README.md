@@ -111,6 +111,30 @@ Heter en fil likadant i bundlen och i render-processens arbetskatalog vinner bun
 
 En bundle vars metadata listar en asset som inte finns på disk, eller vars källa inte är giltig UTF-8, går inte att skicka: anropet svarar `400 input_error` och namnger filen. Ingenting har då nått render-tjänsten.
 
+## Databas och migrationer
+
+Konton och parkopplingar ligger i Postgres. Adressen står i `DATABASE_URL` (`postgresql://klartex:<lösenord>@postgres:5432/klartex` i stacken); `src/klartex_se/db.py` skriver om det bara schemat till psycopg3-dialekten SQLAlchemy behöver och bygger engine och sessionsfabrik vid första användning. Ingen anslutning öppnas vid import: `/api/health` är en liveness-probe, inte en readiness-probe, och svarar `200` även när databasen är nere — annars skulle Docker starta om backenden varje gång databasen startade om.
+
+Schemat ägs av alembic i `migrations/`. Revisionerna är handskrivna och numrerade; konventionerna står i `migrations/versions/README.md`. `alembic.ini` och `migrations/` följer med in i imagen, så deployen preflightar och migrerar med exakt den image som ska serva.
+
+```bash
+cd backend
+export DATABASE_URL=postgresql://klartex:klartex@localhost:5432/klartex
+
+alembic current        # vilken revision databasen står på (deployens preflight)
+alembic heads          # vilken revision koden vill nå
+alembic upgrade head
+alembic downgrade -1
+```
+
+En lokal databas att köra mot:
+
+```bash
+docker run -d --name klartex-pg -p 5432:5432 \
+  -e POSTGRES_USER=klartex -e POSTGRES_PASSWORD=klartex -e POSTGRES_DB=klartex \
+  postgres:18-alpine
+```
+
 ## Lokal utveckling
 
 ```bash
@@ -136,9 +160,13 @@ Utan `klartex serve` igång svarar `/api/render` `502 render_unavailable`; disco
 
 Tester behöver ingen render-tjänst: enhetstesterna ersätter proxy-anropet, och `tests/test_contract.py` driver `klartex.server` i samma process. `xelatex` behövs bara för de två testerna som renderar på riktigt, och de hoppas över när det saknas. Samma pytest-svit körs i CI före image-bygget.
 
+`tests/test_migrations.py` kör mot en riktig Postgres och hoppas över när `DATABASE_URL` är osatt eller pekar på något onåbart. Sviten är destruktiv — varje test börjar från ett tomt `public`-schema — så peka den på en slaskdatabas, aldrig på en med riktiga rader. CI ger den en engångs-servicecontainer.
+
 ```bash
 pytest
 pytest -k "not render"   # bara discovery-tester (snabbt, ingen xelatex)
+
+DATABASE_URL=postgresql://klartex:klartex@localhost:5432/klartex pytest tests/test_migrations.py
 ```
 
 ## Docker
