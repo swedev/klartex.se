@@ -16,7 +16,7 @@ FROM ghcr.io/swedev/klartex-base:20260828-3@sha256:b011056413d449bdc41b893ff1bd5
 WORKDIR /app
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir \
-        klartex==0.15.0 \
+        klartex==0.17.0 \
         "fastapi>=0.115.0" \
         "uvicorn[standard]>=0.34.0" \
         "python-multipart>=0.0.20"
