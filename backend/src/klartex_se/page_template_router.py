@@ -53,6 +53,8 @@ def get(name: str) -> dict:
         return get_bundle(name)
     except PageTemplateNotFound as e:
         raise HTTPException(404, f"Page template {name!r} not found") from e
+    except PageTemplateError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
 
 
 AUTH_RESPONSES = {

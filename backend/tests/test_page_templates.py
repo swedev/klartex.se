@@ -286,6 +286,13 @@ def test_create_then_get_then_delete(client):
     assert r.status_code == 404
 
 
+@pytest.mark.parametrize("name", ["Formal", "a.b", "x_y", "-lead"])
+def test_get_malformed_name_returns_400(client, name):
+    """A name failing NAME_RE is the caller's error, not a server failure."""
+    r = client.get(f"/api/page-templates/{name}")
+    assert r.status_code == 400
+
+
 def test_create_conflict_then_overwrite(client):
     body = {"name": "x", "template": b64("v1"), "assets": {}}
     r = client.post("/api/page-templates", json=body, headers=AUTH)
