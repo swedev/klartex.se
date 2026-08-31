@@ -64,7 +64,7 @@ Taggen måste matcha `pyproject.toml` — annars stannar deployen innan den rör
 
 Rollback: kör workflowen via `workflow_dispatch` från en tidigare tagg. Den checkar ut den taggens träd, läser dess version *och dess kärn-pin*, och deployar det matchande paret. Alla version-taggar ligger kvar i GHCR.
 
-Rollback stöds bara till versioner på **samma migrations-head**, och det är operatören som måste kontrollera det. Actions kör workflow-definitionen som ligger på den ref som dispatchas, så en tagg från före migrationspreflighten deployar med sin egen, ogrindade, version av `deploy.yml` — den startar den gamla stacken mot en redan migrerad databas utan att någon kontroll säger ifrån. Jämför taggens `backend/migrations/versions/` med vad `alembic current` rapporterar på servern innan du dispatchar.
+Rollback stöds bara till versioner på **samma migrations-head** — samma konvention som timla och styrla: migrationer är forward-only, och preflighten failar en image som inte kan lösa databasens aktuella revision. Actions kör workflow-definitionen på den ref som dispatchas, och varje tagg från `v0.7.0` (första databas-releasen) bär preflighten i sin egen definition; taggar före `v0.7.0` saknar databas helt och rör aldrig `pgdata`. Stoppar preflighten rollbacken: rulla framåt med en rättad release i stället.
 
 Kör compose-filen mot en `.env` som saknar `KLARTEX_VERSION` stannar `docker compose pull` på den saknade variabeln — före omstarten, med den körande stacken orörd.
 

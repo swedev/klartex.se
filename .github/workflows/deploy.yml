@@ -13,14 +13,13 @@ name: Release
 # while the old stack still serves, so a rollback across a migration fails
 # before production is taken down.
 #
-# That gate does NOT protect a workflow_dispatch from an older tag. Actions
-# runs the workflow definition at the dispatched ref, so a tag cut before
-# this preflight existed deploys with its own, unguarded, version of this
-# file and will happily restart the old stack against a migrated database.
-# Rollback is therefore supported only to versions on the same migration
-# head, and it is the operator who has to confirm that — compare the tag's
-# backend/migrations/versions/ against what `alembic current` reports on
-# the server before dispatching. See infra/README.md.
+# That gate lives in the workflow definition, and Actions runs the
+# definition at the dispatched ref. Every tag from v0.7.0 — the first
+# database release — carries it; tags before v0.7.0 predate the database
+# entirely, so their stacks have no postgres service and never touch
+# pgdata. Rollback is therefore supported only to versions on the same
+# migration head: the preflight fails anything else — roll forward
+# instead. Same convention as timla / styrla. See infra/README.md.
 #
 # The frontend at app.klartex.se is not deployed here. ~/app is fed from
 # app/dist, and the source that builds it lives on the unmerged #14 branch
