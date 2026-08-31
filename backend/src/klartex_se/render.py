@@ -3,11 +3,12 @@
 Wraps `klartex.render()`. Supports three modes for the page template:
 
 1. `page_template: "vkf"` — name of a bundle registered via
-   /api/page-templates. Server loads its tex.jinja + asset_dir.
-2. `page_template: "formal" | "clean" | "none"` — klartex built-in,
-   passed through as data["page_template"].
-3. `page_template: null` — whichever default klartex picks
-   (currently "none").
+   /api/page-templates. Its tex.jinja owns the header slot and its
+   directory is the asset_dir.
+2. `page_template: {...}` — klartex's slot form, passed through as
+   data["page_template"].
+3. `page_template: null` — whichever default klartex picks for the
+   surface.
 
 Validation errors and xelatex failures are mapped to HTTP responses with
 structured detail the frontend can present. Schema violations and block
@@ -43,10 +44,6 @@ from klartex_se.page_templates import (
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["render"])
-
-# klartex built-in page-template names. Passed through as data["page_template"];
-# bundle lookup is skipped for these.
-BUILTIN_PAGE_TEMPLATES = {"formal", "clean", "none"}
 
 # Cap on concurrent xelatex runs. FastAPI dispatches sync endpoints to a
 # thread pool of ~40 threads, so without a cap that many xelatex processes
@@ -171,14 +168,24 @@ class RenderRequest(BaseModel):
         examples=["_block", "protokoll", "faktura"],
     )
     data: dict = Field(..., description="Template data; validated against schema.")
-    page_template: str | None = Field(
+    page_template: str | dict | None = Field(
         None,
         description=(
-            "Either a registered bundle name (see /api/page-templates) or "
-            "one of the klartex built-ins: formal, clean, none. If null, "
-            "klartex picks its default."
+            "Either a registered bundle name (see /api/page-templates) or a "
+            "page-template object in klartex's slot form, which is passed "
+            "through as `data.page_template`. A bundle owns the header slot "
+            "and empties the footer. If null, klartex picks the default for "
+            "the surface."
         ),
-        examples=["vkf", "formal"],
+        examples=[
+            "vkf",
+            {
+                "header": {
+                    "variant": "letterhead",
+                    "fields": {"org_name": "Föreningen Klartex"},
+                }
+            },
+        ],
     )
 
 
@@ -240,30 +247,34 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
                 },
             )
 
-    page_template_source: str | None = None
+    header_source: str | None = None
     asset_dir: Path | None = None
     data = req.data
 
-    if req.page_template:
-        if req.page_template in BUILTIN_PAGE_TEMPLATES:
-            # Klartex resolves this internally from data.page_template.
-            data = {**data, "page_template": req.page_template}
-        else:
-            try:
-                bundle_dir = get_bundle_path(req.page_template)
-            except PageTemplateNotFound as e:
-                raise HTTPException(
-                    400,
-                    detail={
-                        "type": "unknown_page_template",
-                        "message": (
-                            f"Page template {req.page_template!r} is not "
-                            "registered and not a built-in."
-                        ),
-                    },
-                ) from e
-            page_template_source = (bundle_dir / TEMPLATE_FILENAME).read_text()
-            asset_dir = bundle_dir
+    if isinstance(req.page_template, dict):
+        # Klartex resolves the slots internally from data.page_template.
+        data = {**data, "page_template": req.page_template}
+    elif req.page_template:
+        try:
+            bundle_dir = get_bundle_path(req.page_template)
+        except PageTemplateNotFound as e:
+            raise HTTPException(
+                400,
+                detail={
+                    "type": "unknown_page_template",
+                    "message": (
+                        f"Page template {req.page_template!r} is not registered."
+                    ),
+                },
+            ) from e
+        # A bundle carries one whole-page source, which klartex takes as the
+        # header slot; emptying the footer keeps the emission identical to a
+        # whole-page template. A footer in `data` loses to the bundle.
+        header_source = (bundle_dir / TEMPLATE_FILENAME).read_text()
+        asset_dir = bundle_dir
+        slots = data.get("page_template")
+        if isinstance(slots, dict) or slots is None:
+            data = {**data, "page_template": {**(slots or {}), "footer": None}}
 
     if not _render_slots.acquire(blocking=False):
         raise HTTPException(
@@ -281,8 +292,8 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
         pdf_bytes = klartex_render(
             req.template,
             data,
-            page_template_source=page_template_source,
             asset_dir=asset_dir,
+            header_source=header_source,
         )
     except ValidationError as e:
         raise HTTPException(

@@ -7,6 +7,7 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
+from klartex_se import page_templates as pt
 from klartex_se import render as render_module
 from klartex_se.auth import TOKEN_HOWTO
 from klartex_se.main import app
@@ -203,23 +204,124 @@ def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch):
     assert r.json()["detail"]["type"] == "unknown_page_template"
 
 
-def test_render_builtin_page_template_passes_through(tmp_path, monkeypatch):
-    """Built-in names (formal/clean/none) skip the bundle lookup."""
-    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
-    # No bundle named "formal" exists; should NOT 400. With xelatex absent
-    # we expect a render_error 500 (or success if xelatex present).
+SLOT_FORM = {
+    "header": {
+        "variant": "letterhead",
+        "fields": {"org_name": "Föreningen Klartex"},
+    },
+    "footer": "pagenumber",
+}
+
+
+def test_render_page_template_object_reaches_the_core_unchanged(fake_render):
+    """An object is klartex's slot form; the endpoint moves it, nothing else."""
     r = client.post(
         "/api/render",
         json={
             "template": "_block",
             "data": {"body": [{"type": "heading", "text": "x"}]},
-            "page_template": "formal",
+            "page_template": SLOT_FORM,
         },
     )
-    assert r.status_code in (200, 500)
-    if r.status_code == 400:
-        # If we ever get here, the built-in passthrough broke.
-        assert r.json()["detail"]["type"] != "unknown_page_template"
+    assert r.status_code == 200, r.text
+    (_, data), kwargs = fake_render[0]
+    assert data["page_template"] == SLOT_FORM
+    assert kwargs["header_source"] is None
+    assert kwargs["asset_dir"] is None
+
+
+def test_render_page_template_object_is_validated_by_the_core():
+    """The slot form is the core's contract, so the core rejects a bad one."""
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": {"header": {"variant": "no-such-variant"}},
+        },
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["type"] == "validation_error"
+
+
+@needs_xelatex
+def test_render_page_template_object_renders():
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": SLOT_FORM,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.content[:4] == b"%PDF"
+
+
+# --- Registered bundles: one source owning the header slot ------------------
+
+
+@pytest.fixture
+def bundle(tmp_path, monkeypatch):
+    """Register a one-source bundle and hand back (name, source, dir)."""
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
+    source = "\\fancyhead[L]{VKF}"
+    pt.save_bundle("vkf", b64(source), {"logo.pdf": b64(b"%PDF-fake")})
+    return "vkf", source, tmp_path / "vkf"
+
+
+def test_bundle_is_sent_as_the_header_source(bundle, fake_render):
+    name, source, bundle_dir = bundle
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": name,
+        },
+    )
+    assert r.status_code == 200, r.text
+    (_, data), kwargs = fake_render[0]
+    assert kwargs["header_source"] == source
+    assert kwargs["asset_dir"] == bundle_dir
+    assert data["page_template"] == {"footer": None}
+
+
+def test_bundle_empties_the_footer_and_keeps_the_other_settings(
+    bundle, fake_render
+):
+    """The bundle owns the whole page, so a caller's footer loses to it."""
+    name, _, _ = bundle
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {
+                "body": [{"type": "heading", "text": "x"}],
+                "page_template": {"footer": {"variant": "columns"}, "font": "Futura"},
+            },
+            "page_template": name,
+        },
+    )
+    assert r.status_code == 200, r.text
+    (_, data), _kwargs = fake_render[0]
+    assert data["page_template"] == {"footer": None, "font": "Futura"}
+
+
+@needs_xelatex
+def test_bundle_renders(bundle):
+    """The whole-page source compiles as the header slot, end to end."""
+    name, _, _ = bundle
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "_block",
+            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "page_template": name,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.content[:4] == b"%PDF"
 
 
 # --- Concurrency cap -------------------------------------------------------

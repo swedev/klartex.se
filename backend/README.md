@@ -46,7 +46,7 @@ Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `
 |---------------|--------|-----|--------|
 | `validation_error` | 400 | Datat bryter mot mallens JSON Schema | Alltid |
 | `input_error` | 400 | Blockvalidering, okänd mall, ogiltig `asset_dir` | När ett block kan pekas ut |
-| `unknown_page_template` | 400 | `page_template` är varken registrerad bundle eller inbyggd | Nej |
+| `unknown_page_template` | 400 | `page_template` namnger ingen registrerad bundle | Nej |
 | `token_required` | 401 | En `Authorization`-header presenterades utan `Bearer `-prefix | Nej |
 | `invalid_token` | 401 | Ett token presenterades men stämmer inte | Nej |
 | `token_required` | 403 | Anonymt anrop med ett `latex`-block; `block_type` namnger blocket | Alltid |
@@ -77,6 +77,19 @@ Ett request som inte ens matchar `RenderRequest` — t.ex. `data` som inte är e
 En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Endpointen tar därför en av två render-platser innan arbetet börjar. Är båda upptagna svaras `503` direkt — med `Retry-After: 5` och `detail.type = "overloaded"` — i stället för att köa.
 
 Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Edge-lagret kompletterar med rate limit och body-gräns på `POST /api/render` (se `infra/Caddyfile`), och containern har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
+
+## Sidmall på `/api/render`
+
+`page_template` på toppnivå väljer sidmall och tar två former:
+
+| Form | Betydelse |
+|------|-----------|
+| Sträng | Namnet på en bundle registrerad via `/api/page-templates` |
+| Objekt | Kärnans slot-form, som skickas vidare som `data.page_template` |
+
+Slot-formen är två oberoende slots, `header` och `footer`. Varje slot är `null` (tom), ett variantnamn eller ett objekt med `variant` och variantens inställningar; en utelämnad slot får ytans default. Formen ägs av kärnan och står i mallens schema (`GET /api/templates/{name}/schema`).
+
+En bundle bär en enda `page_template.tex.jinja` som beskriver hela sidan. Den skickas till kärnan som header-slotens källa och footern sätts till `null`, vilket ger samma sida som en helsidesmall. Bundlen äger därmed båda slotarna: både `header` och `footer` i `data.page_template` får ge vika. Dokumentinställningarna där — `font`, `header_font`, `diff_style`, `page_numbers` och `first_page_header` — gäller oförändrat.
 
 ## Assets i registrerade sidmallar
 
