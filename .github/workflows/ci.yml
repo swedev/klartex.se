@@ -24,10 +24,29 @@ jobs:
         with:
           python-version: '3.12'
 
-      # xelatex is not installed here, so the render tests that need it skip
+      # KLARTEX_VERSION is not a version of its own: it names the render
+      # image the deploy pulls, and that has to be the core the backend
+      # was built and tested against. The pin in pyproject.toml is the
+      # source; .env.example only carries it to the server.
+      - name: klartex pin matches KLARTEX_VERSION
+        run: |
+          pin=$(python3 -c "
+          import re, tomllib
+          deps = tomllib.load(open('backend/pyproject.toml','rb'))['project']['dependencies']
+          print(next(re.fullmatch(r'klartex==(.+)', d).group(1) for d in deps if d.startswith('klartex==')))
+          ")
+          env=$(sed -n 's/^KLARTEX_VERSION=//p' infra/.env.example)
+          echo "pyproject: $pin, .env.example: $env"
+          if [[ "$pin" != "$env" ]]; then
+            echo "backend/pyproject.toml pins klartex==$pin but infra/.env.example says KLARTEX_VERSION=$env" >&2
+            exit 1
+          fi
+
+      # xelatex is not installed here, so the tests that need it skip
       # themselves. Everything else — schema validation, error shapes, the
-      # concurrency cap — runs. The full render path is covered by the smoke
-      # test in the release workflow.
+      # in-flight cap, and the backend → render contract driven in-process
+      # against klartex.server — runs. The full render path is covered by
+      # the two-container smoke test in the release workflow.
       - name: Run tests
         working-directory: ./backend
         run: |

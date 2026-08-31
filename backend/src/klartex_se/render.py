@@ -1,21 +1,24 @@
 """Render endpoint: JSON in, PDF out.
 
-Wraps `klartex.render()`. Supports three modes for the page template:
+Policy lives here; compilation does not. The endpoint decides what the
+caller is allowed to render, resolves the page template against the
+registry, and proxies the work to the render service, which is the only
+process that runs xelatex.
+
+Three modes for the page template:
 
 1. `page_template: "vkf"` — name of a bundle registered via
-   /api/page-templates. Its tex.jinja owns the header slot and its
-   directory is the asset_dir.
+   /api/page-templates. Its tex.jinja owns the header slot, and its source
+   and assets travel inline with the render call.
 2. `page_template: {...}` — klartex's slot form, passed through as
    data["page_template"].
 3. `page_template: null` — whichever default klartex picks for the
    surface.
 
-Validation errors and xelatex failures are mapped to HTTP responses with
-structured detail the frontend can present. Schema violations and block
-validation errors both carry `detail.path` — a
-`["body", 1, "items", 0, "text"]` list addressing the failing node in the
-submitted data — so a client can mark the offending block without parsing
-`detail.message`.
+Error shapes come from the render service and pass through unchanged, so
+`detail.type`, `detail.path` and `Retry-After` mean what they have always
+meant. The one answer this layer adds is `502 render_unavailable`, when
+the render service cannot be reached or does not answer in time.
 
 The endpoint is tier-aware. Anonymous callers render every block except
 `latex`, which passes raw LaTeX to the compiler and answers `403
@@ -23,77 +26,32 @@ token_required`; a valid API token unlocks the full block surface.
 """
 
 import logging
-import re
 import threading
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
-from jsonschema import ValidationError
 from pydantic import BaseModel, Field
-
-from klartex import render as klartex_render
 
 from klartex_se.auth import TOKEN_HOWTO, Tier, render_tier
 from klartex_se.page_templates import (
+    PageTemplateError,
     PageTemplateNotFound,
-    TEMPLATE_FILENAME,
     get_bundle_path,
+    load_bundle_payload,
 )
+from klartex_se.render_client import RenderUpstreamError, render_pdf
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["render"])
 
-# Cap on concurrent xelatex runs. FastAPI dispatches sync endpoints to a
-# thread pool of ~40 threads, so without a cap that many xelatex processes
-# can start at once. The value assumes a single uvicorn worker per
-# container: additional workers or replicas multiply the effective cap.
-MAX_CONCURRENT_RENDERS = 2
+# Cap on render calls in flight towards the render service. The same number
+# as the render service's own cap: further calls could only wait for a 503
+# from it, and two is the ceiling on how many bundle payloads — up to ~68 MB
+# of base64 each, plus the JSON copies of them — are built here at once.
+MAX_INFLIGHT_RENDERS = 2
 
-_render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
-
-# Block position inside a klartex block-validation message, e.g. `body[1]`
-# or `body[0].items[1][0]` for a block nested in a carrier block.
-_BLOCK_POSITION = r"body(?:\[\d+\]|\.[a-z_]+)+"
-
-# The three message forms `klartex.renderer._validate_blocks` raises as
-# ValueError. Anchored on the full form rather than searching for
-# `at body[...]`: in the unknown-type message the type name is caller
-# supplied and may itself contain that substring. The greedy `'.*'` plus
-# the `. Available: ` anchor therefore selects the last occurrence.
-# A message form the core changes falls through to `None`; the endpoint
-# tests in tests/test_render.py run against the real core and pin this.
-_BLOCK_ERROR_RE = re.compile(
-    rf"^(?:Block at (?P<a>{_BLOCK_POSITION}) is missing 'type'$"
-    rf"|Unknown block type '.*' at (?P<b>{_BLOCK_POSITION})\. Available: "
-    rf"|Invalid '[a-z_]+' block at (?P<c>{_BLOCK_POSITION}): )",
-    re.DOTALL,
-)
-
-
-def _block_error_path(exc: ValueError) -> list[str | int] | None:
-    """Locate the node a klartex block-validation error refers to.
-
-    Returns the position as a `["body", 1, "items", 0, "text"]` list —
-    the same shape `list(ValidationError.absolute_path)` gives for the
-    schema-validation path — or None when the message carries no block
-    position (unknown template, invalid asset_dir).
-    """
-    m = _BLOCK_ERROR_RE.match(str(exc))
-    if m is None:
-        return None
-    where = m.group("a") or m.group("b") or m.group("c")
-    path: list[str | int] = [
-        int(part) if part.isdigit() else part
-        for part in re.findall(r"\d+|[a-z_]+", where)
-    ]
-    # The wrapped jsonschema error, when present, locates the field
-    # inside the block; appending it addresses the failing node itself.
-    cause = exc.__cause__
-    if isinstance(cause, ValidationError):
-        path.extend(cause.absolute_path)
-    return path
+_inflight_slots = threading.BoundedSemaphore(MAX_INFLIGHT_RENDERS)
 
 
 def _child_block_lists(
@@ -189,6 +147,16 @@ class RenderRequest(BaseModel):
     )
 
 
+def _unknown_page_template(name: str) -> HTTPException:
+    return HTTPException(
+        400,
+        detail={
+            "type": "unknown_page_template",
+            "message": f"Page template {name!r} is not registered.",
+        },
+    )
+
+
 @router.post(
     "/render",
     response_class=Response,
@@ -220,11 +188,19 @@ class RenderRequest(BaseModel):
             )
         },
         500: {"description": "xelatex failure"},
+        502: {
+            "description": (
+                "The render service could not be reached, answered too "
+                "slowly, or answered something unusable. `detail.type` is "
+                "`render_unavailable` and the call is safe to retry."
+            )
+        },
         503: {
             "description": (
                 "Either too many concurrent renders (`detail.type` is "
-                "`overloaded`) or a token was presented to an instance "
-                "with none configured (`token_not_configured`)."
+                "`overloaded`, raised here or by the render service) or a "
+                "token was presented to an instance with none configured "
+                "(`token_not_configured`)."
             )
         },
     },
@@ -247,36 +223,29 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
                 },
             )
 
-    header_source: str | None = None
-    asset_dir: Path | None = None
     data = req.data
+    bundle: str | None = None
 
     if isinstance(req.page_template, dict):
         # Klartex resolves the slots internally from data.page_template.
         data = {**data, "page_template": req.page_template}
     elif req.page_template:
+        # Existence is policy and settled here; the bundle's contents are
+        # read inside the semaphore, where the memory they take is
+        # accounted for.
         try:
-            bundle_dir = get_bundle_path(req.page_template)
+            get_bundle_path(req.page_template)
         except PageTemplateNotFound as e:
-            raise HTTPException(
-                400,
-                detail={
-                    "type": "unknown_page_template",
-                    "message": (
-                        f"Page template {req.page_template!r} is not registered."
-                    ),
-                },
-            ) from e
+            raise _unknown_page_template(req.page_template) from e
+        bundle = req.page_template
         # A bundle carries one whole-page source, which klartex takes as the
         # header slot; emptying the footer keeps the emission identical to a
         # whole-page template. A footer in `data` loses to the bundle.
-        header_source = (bundle_dir / TEMPLATE_FILENAME).read_text()
-        asset_dir = bundle_dir
         slots = data.get("page_template")
         if isinstance(slots, dict) or slots is None:
             data = {**data, "page_template": {**(slots or {}), "footer": None}}
 
-    if not _render_slots.acquire(blocking=False):
+    if not _inflight_slots.acquire(blocking=False):
         raise HTTPException(
             status_code=503,
             detail={
@@ -289,35 +258,32 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
         )
 
     try:
-        pdf_bytes = klartex_render(
-            req.template,
-            data,
-            asset_dir=asset_dir,
-            header_source=header_source,
-        )
-    except ValidationError as e:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "type": "validation_error",
-                "message": e.message,
-                "path": list(e.absolute_path),
-            },
-        ) from e
-    except ValueError as e:
-        detail: dict = {"type": "input_error", "message": str(e)}
-        path = _block_error_path(e)
-        if path is not None:
-            detail["path"] = path
-        raise HTTPException(status_code=400, detail=detail) from e
-    except RuntimeError as e:
-        log.exception("klartex render failed for template=%s", req.template)
-        raise HTTPException(
-            status_code=500,
-            detail={"type": "render_error", "message": str(e)},
-        ) from e
+        header_source: str | None = None
+        assets: dict[str, str] = {}
+        if bundle is not None:
+            try:
+                header_source, assets = load_bundle_payload(bundle)
+            except PageTemplateNotFound as e:
+                raise _unknown_page_template(bundle) from e
+            except PageTemplateError as e:
+                raise HTTPException(
+                    400,
+                    detail={"type": "input_error", "message": str(e)},
+                ) from e
+
+        try:
+            pdf_bytes = render_pdf(
+                req.template,
+                data,
+                header_source=header_source,
+                assets=assets,
+            )
+        except RenderUpstreamError as e:
+            raise HTTPException(
+                status_code=e.status_code, detail=e.detail, headers=e.headers
+            ) from e
     finally:
-        _render_slots.release()
+        _inflight_slots.release()
 
     return Response(
         content=pdf_bytes,

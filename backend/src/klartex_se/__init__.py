@@ -1,3 +1,6 @@
-"""klartex.se backend — thin FastAPI wrapper around the klartex library."""
+"""klartex.se backend — the public /api surface: policy, discovery, registry.
 
-__version__ = "0.5.0"
+Compilation happens in the klartex render service; see render_client.py.
+"""
+
+__version__ = "0.6.0"

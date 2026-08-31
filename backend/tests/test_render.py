@@ -1,9 +1,15 @@
-"""Render endpoint — requires xelatex to be on PATH for actual renders."""
+"""Render endpoint — policy, page-template resolution and the proxy hop.
+
+Nothing here compiles anything: `render_pdf` is replaced by a fake, so what
+is pinned is what this layer decides on its own — who may render what, what
+payload the render service is handed, and how its answers reach the client.
+The chain against a real renderer lives in test_contract.py.
+"""
 
 import base64
-import shutil
 import threading
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,11 +17,9 @@ from klartex_se import page_templates as pt
 from klartex_se import render as render_module
 from klartex_se.auth import TOKEN_HOWTO
 from klartex_se.main import app
+from klartex_se.render_client import RenderUpstreamError
 
 client = TestClient(app)
-
-XELATEX = shutil.which("xelatex")
-needs_xelatex = pytest.mark.skipif(XELATEX is None, reason="xelatex not on PATH")
 
 API_TOKEN = "test-token-do-not-use-in-prod"
 
@@ -35,18 +39,36 @@ def api_token(monkeypatch):
 
 @pytest.fixture
 def fake_render(monkeypatch):
-    """Replace the compiler, so tier tests never invoke xelatex."""
+    """Replace the proxy call, so no test needs a render service."""
     calls: list[tuple] = []
 
     def fake(*args, **kwargs):
         calls.append((args, kwargs))
         return b"%PDF-fake"
 
-    monkeypatch.setattr(render_module, "klartex_render", fake)
+    monkeypatch.setattr(render_module, "render_pdf", fake)
     return calls
 
 
+@pytest.fixture
+def upstream_raises(monkeypatch):
+    """Make the proxy call fail the way the render client would."""
+
+    def install(error):
+        def fake(*args, **kwargs):
+            raise error
+
+        monkeypatch.setattr(render_module, "render_pdf", fake)
+
+    return install
+
+
 LATEX_BLOCK = {"type": "latex", "body": "\\hrule"}
+
+MINIMAL_BODY = {
+    "template": "_block",
+    "data": {"body": [{"type": "heading", "text": "x"}]},
+}
 
 
 def post_blocks(body_blocks, headers=None):
@@ -63,145 +85,7 @@ def b64(s: str | bytes) -> str:
     return base64.b64encode(s).decode()
 
 
-@needs_xelatex
-def test_render_minimal_block_doc():
-    body = {
-        "template": "_block",
-        "data": {
-            "lang": "sv",
-            "body": [
-                {"type": "heading", "text": "Test"},
-                {"type": "text", "text": "Hello world."},
-            ],
-        },
-    }
-    r = client.post("/api/render", json=body)
-    assert r.status_code == 200, r.text
-    assert r.headers["content-type"] == "application/pdf"
-    assert r.content[:4] == b"%PDF"
-
-
-def post_block_error(body_blocks):
-    """POST a block document expected to fail validation; return the detail."""
-    r = client.post(
-        "/api/render",
-        json={"template": "_block", "data": {"body": body_blocks}},
-    )
-    assert r.status_code == 400, r.text
-    return r.json()["detail"]
-
-
-def test_render_validation_error_returns_structured_400():
-    """Block validation errors carry both a message and a structured path.
-
-    klartex.render() wraps block validation as ValueError → input_error;
-    render.py recovers the block position from the message and reports it
-    as `detail.path`, in the same list shape the jsonschema path uses.
-    """
-    detail = post_block_error([{"type": "heading"}])  # missing required `text`
-    assert detail["type"] == "input_error"
-    assert "text" in detail["message"]  # mentions the missing field
-    assert detail["path"] == ["body", 0]
-
-
-def test_render_block_error_path_points_at_the_offending_block():
-    detail = post_block_error(
-        [
-            {"type": "heading", "text": "ok"},
-            {"type": "text"},  # missing required `text`
-        ]
-    )
-    assert detail["type"] == "input_error"
-    assert detail["path"] == ["body", 1]
-    assert "body[1]" in detail["message"]  # message stays readable
-
-
-def test_render_block_error_path_reaches_into_the_block():
-    """A field-level failure inside a block extends the path to the field."""
-    detail = post_block_error([{"type": "heading", "text": 123}])
-    assert detail["path"] == ["body", 0, "text"]
-
-    detail = post_block_error([{"type": "list", "items": [{"text": 5}]}])
-    assert detail["path"] == ["body", 0, "items", 0, "text"]
-
-
-def test_render_block_error_path_covers_nested_blocks():
-    """Blocks nested in a carrier block get their full position."""
-    columns = [[{"type": "text", "text": "a"}], [{"type": "text"}]]
-    detail = post_block_error([{"type": "columns", "items": columns}])
-    assert detail["path"] == ["body", 0, "items", 1, 0]
-
-    columns[1][0] = {"type": "text", "text": 123}  # wrong field type
-    detail = post_block_error([{"type": "columns", "items": columns}])
-    assert detail["path"] == ["body", 0, "items", 1, 0, "text"]
-
-
-def test_render_unknown_block_type_carries_path():
-    detail = post_block_error([{"type": "nope", "text": "x"}])
-    assert detail["type"] == "input_error"
-    assert detail["path"] == ["body", 0]
-
-
-def test_render_unknown_block_type_cannot_forge_a_path():
-    """A block type carrying its own `at body[...]` does not move the path."""
-    forged = "x' at body[9]. Available: y"
-    detail = post_block_error([{"type": forged, "text": "x"}])
-    assert detail["path"] == ["body", 0]
-
-
-def test_render_schema_validation_path_is_unchanged():
-    """Both error paths report the same shape for the same position."""
-    detail = post_block_error([{"text": "x"}])  # block without `type`
-    assert detail["type"] == "validation_error"
-    assert detail["path"] == ["body", 0]
-
-    r = client.post("/api/render", json={"template": "_block", "data": {}})
-    assert r.status_code == 400
-    detail = r.json()["detail"]
-    assert detail["type"] == "validation_error"
-    assert detail["path"] == []
-
-
-def test_render_block_with_empty_type_carries_path():
-    """An empty `type` satisfies the top-level schema but not the core.
-
-    It reaches `_validate_blocks`, which reports it as
-    `Block at body[i] is missing 'type'` — the third message form the
-    path extraction has to recognise.
-    """
-    detail = post_block_error(
-        [{"type": "heading", "text": "ok"}, {"type": "", "text": "x"}]
-    )
-    assert detail["type"] == "input_error"
-    assert detail["path"] == ["body", 1]
-    assert "body[1]" in detail["message"]
-
-
-def test_block_error_path_returns_none_for_other_errors():
-    assert render_module._block_error_path(ValueError("Unknown template")) is None
-
-
-def test_render_unknown_template_returns_400():
-    """An error with no block position carries no `path`."""
-    r = client.post("/api/render", json={"template": "nope", "data": {}})
-    assert r.status_code == 400
-    detail = r.json()["detail"]
-    assert detail["type"] == "input_error"
-    assert "path" not in detail
-
-
-def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch):
-    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
-    r = client.post(
-        "/api/render",
-        json={
-            "template": "_block",
-            "data": {"body": [{"type": "heading", "text": "x"}]},
-            "page_template": "never-registered",
-        },
-    )
-    assert r.status_code == 400
-    assert r.json()["detail"]["type"] == "unknown_page_template"
+# --- Page templates: object, bundle name, or nothing ------------------------
 
 
 SLOT_FORM = {
@@ -213,7 +97,19 @@ SLOT_FORM = {
 }
 
 
-def test_render_page_template_object_reaches_the_core_unchanged(fake_render):
+def test_render_without_a_page_template_sends_no_source(fake_render):
+    r = client.post("/api/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 200, r.text
+    assert r.content == b"%PDF-fake"
+    assert r.headers["content-type"] == "application/pdf"
+    (_, data), kwargs = fake_render[0]
+    assert "page_template" not in data
+    assert kwargs["header_source"] is None
+    assert kwargs["assets"] == {}
+
+
+def test_render_page_template_object_is_forwarded_unchanged(fake_render):
     """An object is klartex's slot form; the endpoint moves it, nothing else."""
     r = client.post(
         "/api/render",
@@ -223,39 +119,29 @@ def test_render_page_template_object_reaches_the_core_unchanged(fake_render):
             "page_template": SLOT_FORM,
         },
     )
+
     assert r.status_code == 200, r.text
     (_, data), kwargs = fake_render[0]
     assert data["page_template"] == SLOT_FORM
     assert kwargs["header_source"] is None
-    assert kwargs["asset_dir"] is None
+    assert kwargs["assets"] == {}
 
 
-def test_render_page_template_object_is_validated_by_the_core():
-    """The slot form is the core's contract, so the core rejects a bad one."""
+def test_render_unknown_page_template_returns_400(tmp_path, monkeypatch, fake_render):
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
+
     r = client.post(
         "/api/render",
         json={
             "template": "_block",
             "data": {"body": [{"type": "heading", "text": "x"}]},
-            "page_template": {"header": {"variant": "no-such-variant"}},
+            "page_template": "never-registered",
         },
     )
-    assert r.status_code == 400, r.text
-    assert r.json()["detail"]["type"] == "validation_error"
 
-
-@needs_xelatex
-def test_render_page_template_object_renders():
-    r = client.post(
-        "/api/render",
-        json={
-            "template": "_block",
-            "data": {"body": [{"type": "heading", "text": "x"}]},
-            "page_template": SLOT_FORM,
-        },
-    )
-    assert r.status_code == 200, r.text
-    assert r.content[:4] == b"%PDF"
+    assert r.status_code == 400
+    assert r.json()["detail"]["type"] == "unknown_page_template"
+    assert fake_render == []
 
 
 # --- Registered bundles: one source owning the header slot ------------------
@@ -263,27 +149,34 @@ def test_render_page_template_object_renders():
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
-    """Register a one-source bundle and hand back (name, source, dir)."""
+    """Register a one-source bundle and hand back (name, source, assets)."""
     monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path))
     source = "\\fancyhead[L]{VKF}"
-    pt.save_bundle("vkf", b64(source), {"logo.pdf": b64(b"%PDF-fake")})
-    return "vkf", source, tmp_path / "vkf"
+    logo = b"%PDF-fake-logo"
+    pt.save_bundle("vkf", b64(source), {"logo.pdf": b64(logo)})
+    return "vkf", source, {"logo.pdf": b64(logo)}
 
 
-def test_bundle_is_sent_as_the_header_source(bundle, fake_render):
-    name, source, bundle_dir = bundle
-    r = client.post(
+def post_bundle(name, data=None):
+    return client.post(
         "/api/render",
         json={
             "template": "_block",
-            "data": {"body": [{"type": "heading", "text": "x"}]},
+            "data": data or {"body": [{"type": "heading", "text": "x"}]},
             "page_template": name,
         },
     )
+
+
+def test_bundle_travels_inline_as_the_header_source(bundle, fake_render):
+    name, source, assets = bundle
+
+    r = post_bundle(name)
+
     assert r.status_code == 200, r.text
     (_, data), kwargs = fake_render[0]
     assert kwargs["header_source"] == source
-    assert kwargs["asset_dir"] == bundle_dir
+    assert kwargs["assets"] == assets
     assert data["page_template"] == {"footer": None}
 
 
@@ -292,76 +185,56 @@ def test_bundle_empties_the_footer_and_keeps_the_other_settings(
 ):
     """The bundle owns the whole page, so a caller's footer loses to it."""
     name, _, _ = bundle
-    r = client.post(
-        "/api/render",
-        json={
-            "template": "_block",
-            "data": {
-                "body": [{"type": "heading", "text": "x"}],
-                "page_template": {"footer": {"variant": "columns"}, "font": "Futura"},
-            },
-            "page_template": name,
+
+    r = post_bundle(
+        name,
+        data={
+            "body": [{"type": "heading", "text": "x"}],
+            "page_template": {"footer": {"variant": "columns"}, "font": "Futura"},
         },
     )
+
     assert r.status_code == 200, r.text
     (_, data), _kwargs = fake_render[0]
     assert data["page_template"] == {"footer": None, "font": "Futura"}
 
 
-@needs_xelatex
-def test_bundle_renders(bundle):
-    """The whole-page source compiles as the header slot, end to end."""
+def test_a_broken_bundle_is_a_400(bundle, tmp_path, fake_render):
+    """An asset the metadata lists but disk does not have never travels."""
     name, _, _ = bundle
-    r = client.post(
-        "/api/render",
-        json={
-            "template": "_block",
-            "data": {"body": [{"type": "heading", "text": "x"}]},
-            "page_template": name,
-        },
+    (tmp_path / name / "logo.pdf").unlink()
+
+    r = post_bundle(name)
+
+    assert r.status_code == 400, r.text
+    detail = r.json()["detail"]
+    assert detail["type"] == "input_error"
+    assert "logo.pdf" in detail["message"]
+    assert fake_render == []
+
+
+# --- Upstream answers -------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [400, 500, 503])
+def test_upstream_status_and_detail_pass_through(upstream_raises, status):
+    detail = {"type": "input_error", "message": "no", "path": ["body", 1]}
+    upstream_raises(RenderUpstreamError(status, detail))
+
+    r = client.post("/api/render", json=MINIMAL_BODY)
+
+    assert r.status_code == status
+    assert r.json()["detail"] == detail
+
+
+def test_upstream_retry_after_reaches_the_client(upstream_raises):
+    upstream_raises(
+        RenderUpstreamError(
+            503,
+            {"type": "overloaded", "message": "busy"},
+            {"Retry-After": "5"},
+        )
     )
-    assert r.status_code == 200, r.text
-    assert r.content[:4] == b"%PDF"
-
-
-# --- Concurrency cap -------------------------------------------------------
-#
-# The tests below never invoke xelatex: klartex_render is replaced by a fake,
-# so they exercise the semaphore alone and run anywhere.
-
-MINIMAL_BODY = {
-    "template": "_block",
-    "data": {"body": [{"type": "heading", "text": "x"}]},
-}
-
-
-@pytest.fixture
-def render_slots(monkeypatch):
-    """Give each test its own semaphore, so a failure cannot leak slots."""
-    slots = threading.BoundedSemaphore(render_module.MAX_CONCURRENT_RENDERS)
-    monkeypatch.setattr(render_module, "_render_slots", slots)
-    return slots
-
-
-def assert_all_slots_free(slots):
-    """Every slot is free — and no more than MAX_CONCURRENT_RENDERS exist."""
-    acquired = [
-        slots.acquire(blocking=False)
-        for _ in range(render_module.MAX_CONCURRENT_RENDERS)
-    ]
-    extra = slots.acquire(blocking=False)
-    for ok in acquired:
-        if ok:
-            slots.release()
-    if extra:
-        slots.release()
-    assert all(acquired), "a render slot leaked"
-    assert not extra, "more slots than MAX_CONCURRENT_RENDERS"
-
-
-def test_render_returns_503_when_all_slots_taken(render_slots):
-    for _ in range(render_module.MAX_CONCURRENT_RENDERS):
-        assert render_slots.acquire(blocking=False)
 
     r = client.post("/api/render", json=MINIMAL_BODY)
 
@@ -370,22 +243,97 @@ def test_render_returns_503_when_all_slots_taken(render_slots):
     assert r.json()["detail"]["type"] == "overloaded"
 
 
-def test_render_releases_slot_after_success(render_slots, monkeypatch):
-    monkeypatch.setattr(
-        render_module, "klartex_render", lambda *a, **kw: b"%PDF-fake"
+def test_an_unreachable_render_service_is_a_502(upstream_raises):
+    upstream_raises(
+        RenderUpstreamError(
+            502,
+            {
+                "type": "render_unavailable",
+                "message": "The render service did not answer.",
+            },
+        )
     )
 
+    r = client.post("/api/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert detail["type"] == "render_unavailable"
+    assert "render:8000" not in detail["message"]
+
+
+def test_a_transport_failure_never_escapes_as_a_500(monkeypatch):
+    """The client turns httpx failures into 502 before the endpoint sees them."""
+
+    def transport_error(request):
+        raise httpx.ConnectError("connection refused")
+
+    from klartex_se import render_client
+
+    monkeypatch.setattr(
+        render_client,
+        "_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(transport_error)),
+    )
+
+    r = client.post("/api/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 502
+    assert r.json()["detail"]["type"] == "render_unavailable"
+
+
+# --- In-flight cap ----------------------------------------------------------
+
+
+@pytest.fixture
+def render_slots(monkeypatch):
+    """Give each test its own semaphore, so a failure cannot leak slots."""
+    slots = threading.BoundedSemaphore(render_module.MAX_INFLIGHT_RENDERS)
+    monkeypatch.setattr(render_module, "_inflight_slots", slots)
+    return slots
+
+
+def assert_all_slots_free(slots):
+    """Every slot is free — and no more than MAX_INFLIGHT_RENDERS exist."""
+    acquired = [
+        slots.acquire(blocking=False)
+        for _ in range(render_module.MAX_INFLIGHT_RENDERS)
+    ]
+    extra = slots.acquire(blocking=False)
+    for ok in acquired:
+        if ok:
+            slots.release()
+    if extra:
+        slots.release()
+    assert all(acquired), "a render slot leaked"
+    assert not extra, "more slots than MAX_INFLIGHT_RENDERS"
+
+
+def test_render_returns_503_when_all_slots_taken(render_slots, fake_render):
+    for _ in range(render_module.MAX_INFLIGHT_RENDERS):
+        assert render_slots.acquire(blocking=False)
+
+    r = client.post("/api/render", json=MINIMAL_BODY)
+
+    assert r.status_code == 503
+    assert r.headers["Retry-After"] == "5"
+    assert r.json()["detail"]["type"] == "overloaded"
+    assert fake_render == []
+
+
+def test_render_releases_slot_after_success(render_slots, fake_render):
     r = client.post("/api/render", json=MINIMAL_BODY)
 
     assert r.status_code == 200
     assert_all_slots_free(render_slots)
 
 
-def test_render_releases_slot_after_failure(render_slots, monkeypatch):
-    def boom(*args, **kwargs):
-        raise RuntimeError("xelatex exploded")
-
-    monkeypatch.setattr(render_module, "klartex_render", boom)
+def test_render_releases_slot_after_an_upstream_failure(
+    render_slots, upstream_raises
+):
+    upstream_raises(
+        RenderUpstreamError(500, {"type": "render_error", "message": "boom"})
+    )
 
     r = client.post("/api/render", json=MINIMAL_BODY)
 
@@ -394,8 +342,18 @@ def test_render_releases_slot_after_failure(render_slots, monkeypatch):
     assert_all_slots_free(render_slots)
 
 
+def test_render_releases_slot_after_a_broken_bundle(render_slots, bundle, tmp_path):
+    name, _, _ = bundle
+    (tmp_path / name / "logo.pdf").unlink()
+
+    r = post_bundle(name)
+
+    assert r.status_code == 400
+    assert_all_slots_free(render_slots)
+
+
 def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
-    """Two renders occupy both slots; a third is rejected immediately."""
+    """Two calls occupy both slots; a third is rejected immediately."""
     in_render = threading.Semaphore(0)
     release = threading.Event()
 
@@ -404,7 +362,7 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
         assert release.wait(timeout=10), "render fake was never released"
         return b"%PDF-fake"
 
-    monkeypatch.setattr(render_module, "klartex_render", blocking_render)
+    monkeypatch.setattr(render_module, "render_pdf", blocking_render)
 
     results: dict[int, int] = {}
 
@@ -413,7 +371,7 @@ def test_render_third_concurrent_request_gets_503(render_slots, monkeypatch):
 
     threads = [
         threading.Thread(target=run, args=(i, ), daemon=True)
-        for i in range(render_module.MAX_CONCURRENT_RENDERS)
+        for i in range(render_module.MAX_INFLIGHT_RENDERS)
     ]
     for t in threads:
         t.start()
@@ -478,8 +436,8 @@ def test_anonymous_nested_latex_block_returns_403(blocks, expected_path):
 
 
 def test_latex_gate_precedes_the_semaphore(render_slots, fake_render):
-    """The 403 does not depend on a free render slot, and renders nothing."""
-    for _ in range(render_module.MAX_CONCURRENT_RENDERS):
+    """The 403 does not depend on a free slot, and nothing is proxied."""
+    for _ in range(render_module.MAX_INFLIGHT_RENDERS):
         assert render_slots.acquire(blocking=False)
 
     r = post_blocks([LATEX_BLOCK])
@@ -559,11 +517,12 @@ def test_recipe_template_is_not_scanned_for_latex(fake_render):
     assert r.status_code != 403
 
 
-def test_openapi_documents_render_auth_responses():
+def test_openapi_documents_render_responses():
     responses = client.get("/api/openapi.json").json()["paths"]["/api/render"]["post"][
         "responses"
     ]
-    assert {"401", "403"} <= set(responses)
+    assert {"401", "403", "502"} <= set(responses)
+    assert "render_unavailable" in responses["502"]["description"]
     description = responses["503"]["description"]
     assert "overloaded" in description
     assert "token_not_configured" in description

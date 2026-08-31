@@ -1,19 +1,22 @@
 [project]
 name = "klartex-se-backend"
-version = "0.5.0"
-description = "HTTP backend for klartex.se — wraps klartex as a library"
+version = "0.6.0"
+description = "HTTP backend for klartex.se — policy and discovery in front of the klartex render service"
 requires-python = ">=3.12"
 dependencies = [
     "klartex==0.17.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",
+    "httpx>=0.27",       # the client that reaches the render service
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "httpx>=0.27",       # for FastAPI TestClient
+    # tests/test_contract.py drives the core's render app in-process, which
+    # needs the core's serve extra. httpx is a runtime dependency already.
+    "klartex[serve]",
 ]
 
 [build-system]

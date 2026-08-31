@@ -113,6 +113,100 @@ def test_delete():
         pt.get_bundle("doomed")
 
 
+# --- Bundle payloads --------------------------------------------------------
+#
+# The render service has no volume and no registry, so a bundle travels
+# inline with the render call. load_bundle_payload is what turns stored
+# files into that payload.
+
+def test_load_bundle_payload_returns_source_and_assets():
+    pt.save_bundle(
+        "vkf",
+        b64("\\fancyhead{VKF}"),
+        {"logo.pdf": b64(b"%PDF-logo"), "font.ttf": b64(b"ttf")},
+    )
+
+    source, assets = pt.load_bundle_payload("vkf")
+
+    assert source == "\\fancyhead{VKF}"
+    assert assets == {"logo.pdf": b64(b"%PDF-logo"), "font.ttf": b64(b"ttf")}
+
+
+def test_load_bundle_payload_without_assets():
+    pt.save_bundle("plain", b64("\\fancyhead{P}"), {})
+
+    source, assets = pt.load_bundle_payload("plain")
+
+    assert source == "\\fancyhead{P}"
+    assert assets == {}
+
+
+def test_load_bundle_payload_keeps_non_ascii_source():
+    pt.save_bundle("sv", b64("\\fancyhead{Årsmöte}"), {})
+
+    source, _ = pt.load_bundle_payload("sv")
+
+    assert source == "\\fancyhead{Årsmöte}"
+
+
+def test_load_bundle_payload_missing_asset_is_a_broken_bundle(tmp_path):
+    pt.save_bundle("vkf", b64("x"), {"logo.pdf": b64(b"%PDF-logo")})
+    (tmp_path / "vkf" / "logo.pdf").unlink()
+
+    with pytest.raises(pt.PageTemplateError, match="logo.pdf"):
+        pt.load_bundle_payload("vkf")
+
+
+def test_load_bundle_payload_rejects_a_source_that_is_not_utf8(tmp_path):
+    pt.save_bundle("latin", b64("x"), {})
+    (tmp_path / "latin" / pt.TEMPLATE_FILENAME).write_bytes(b"\\head{\xe5\xe4\xf6}")
+
+    with pytest.raises(pt.PageTemplateError, match="UTF-8"):
+        pt.load_bundle_payload("latin")
+
+
+def test_load_bundle_payload_rejects_an_asset_name_from_outside(tmp_path):
+    """Metadata edited on disk cannot make the reader leave the bundle."""
+    pt.save_bundle("vkf", b64("x"), {})
+    meta = tmp_path / "vkf" / pt.METADATA_FILENAME
+    meta.write_text(meta.read_text().replace('"asset_names": []',
+                                             '"asset_names": ["../secret.pdf"]'))
+
+    with pytest.raises(pt.PageTemplateError, match="secret.pdf"):
+        pt.load_bundle_payload("vkf")
+
+
+def test_load_bundle_payload_reports_a_deleted_bundle_as_not_found():
+    with pytest.raises(pt.PageTemplateNotFound):
+        pt.load_bundle_payload("never-registered")
+
+
+def test_load_bundle_payload_rejects_unreadable_metadata(tmp_path):
+    """Metadata edited into invalid JSON is a broken bundle, not a 500.
+
+    get_bundle_path only proves the file exists, so this is the first read
+    that parses it.
+    """
+    pt.save_bundle("vkf", b64("x"), {})
+    (tmp_path / "vkf" / pt.METADATA_FILENAME).write_text("{not json")
+
+    with pytest.raises(pt.PageTemplateError, match=pt.METADATA_FILENAME):
+        pt.load_bundle_payload("vkf")
+
+
+def test_load_bundle_payload_reports_metadata_vanishing_as_not_found(monkeypatch):
+    """Deleted between the existence check and the metadata read."""
+    pt.save_bundle("vkf", b64("x"), {})
+
+    def vanished(bundle_dir):
+        raise FileNotFoundError(bundle_dir / pt.METADATA_FILENAME)
+
+    monkeypatch.setattr(pt, "_load_metadata", vanished)
+
+    with pytest.raises(pt.PageTemplateNotFound):
+        pt.load_bundle_payload("vkf")
+
+
 # --- HTTP routes ------------------------------------------------------------
 
 def test_list_empty(client):

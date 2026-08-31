@@ -58,7 +58,7 @@ jobs:
           pip install -e '.[dev]'
           pytest -q
 
-      - name: Resolve version
+      - name: Resolve versions
         id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -68,6 +68,14 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The render image is the core's artifact, tagged with the core
+          # version. ci.yml has already checked this against .env.example.
+          klartex=$(python3 -c "
+          import re, tomllib
+          deps = tomllib.load(open('backend/pyproject.toml','rb'))['project']['dependencies']
+          print(next(re.fullmatch(r'klartex==(.+)', d).group(1) for d in deps if d.startswith('klartex==')))
+          ")
+          echo "klartex=$klartex" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -88,23 +96,73 @@ jobs:
           load: true
           tags: smoke-test:amd64
 
-      - name: Smoke-test (render a minimal block-engine PDF)
+      # The backend compiles nothing, so it is smoke-tested against a real
+      # render service — the same image and version the deploy will pull.
+      # Alone it could only prove that it can answer 502.
+      - name: Smoke-test (the whole chain, in two containers)
+        env:
+          KLARTEX: ${{ steps.version.outputs.klartex }}
         run: |
-          docker run -d --name smoke -p 18000:8000 smoke-test:amd64
-          for i in $(seq 1 30); do
+          set -euo pipefail
+
+          docker network create smoke-net
+          # Named `render` because that is the host the backend defaults to.
+          docker run -d --name render --network smoke-net \
+            "ghcr.io/swedev/klartex-render:$KLARTEX"
+          docker run -d --name smoke --network smoke-net -p 18000:8000 \
+            smoke-test:amd64
+
+          dump_logs() {
+            echo "--- backend logs ---"; docker logs smoke
+            echo "--- render logs ---"; docker logs render
+          }
+
+          up=0
+          for i in $(seq 1 60); do
             if curl -fsS http://localhost:18000/api/health >/dev/null 2>&1; then
-              echo "✓ /api/health up after ${i}s"; break
+              echo "✓ /api/health up after ${i}s"; up=1; break
             fi
             sleep 1
           done
+          [ "$up" = 1 ] || { echo "backend never came up"; dump_logs; exit 1; }
           curl -fsS http://localhost:18000/api/health
+
+          # Discovery answers from the backend's own core, and it has to be
+          # the core that renders. The image tag comes from the same pin, so
+          # this is the running proof of it.
+          curl -fsS http://localhost:18000/api/templates | grep -q '"_block"' || {
+            echo "/api/templates does not list _block"; dump_logs; exit 1;
+          }
+          backend_core=$(curl -fsS http://localhost:18000/api/health | jq -r .klartex)
+          render_core=$(docker exec render python3 -c "
+          import json, urllib.request
+          print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['version'])
+          ")
+          if [ "$backend_core" != "$render_core" ]; then
+            echo "klartex differs: backend $backend_core, render $render_core"
+            dump_logs; exit 1
+          fi
+          echo "✓ both services on klartex $backend_core"
+
+          # The anonymous tier may not send raw LaTeX. A 403 here is the
+          # policy layer answering before anything reaches the compiler.
+          code=$(curl -s -o /tmp/latex.json -w '%{http_code}' \
+            -X POST http://localhost:18000/api/render \
+            -H "Content-Type: application/json" \
+            -d '{"template":"_block","data":{"body":[{"type":"latex","body":"\\hrule"}]}}')
+          if [ "$code" != "403" ]; then
+            echo "anonymous latex block answered HTTP $code, expected 403"
+            cat /tmp/latex.json; dump_logs; exit 1
+          fi
+          echo "✓ anonymous latex block refused with 403"
+
           code=$(curl -s -o /tmp/out.pdf -w '%{http_code}' \
             -X POST http://localhost:18000/api/render \
             -H "Content-Type: application/json" \
             -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"CI smoke"},{"type":"text","text":"verifies xelatex + all sty files load"}]}}')
           echo "render HTTP $code"
           if [ "$code" != "200" ]; then
-            echo "--- backend logs ---"; docker logs smoke
+            dump_logs
             echo "--- response ---"; cat /tmp/out.pdf
             exit 1
           fi
@@ -112,7 +170,7 @@ jobs:
             echo "Response is not a PDF"; head -c 200 /tmp/out.pdf; exit 1;
           }
           echo "✓ render produced $(stat -c%s /tmp/out.pdf) bytes of PDF"
-          docker stop smoke
+          docker stop smoke render
 
       # Only after the smoke test passes does anything reach the registry.
       - uses: docker/build-push-action@v6
@@ -136,7 +194,7 @@ jobs:
       # Re-resolved here because jobs do not share step outputs implicitly.
       # The build job already failed the run if the tag and pyproject.toml
       # disagreed, so this cannot diverge from what was published.
-      - name: Resolve version
+      - name: Resolve versions
         id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -146,6 +204,12 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          klartex=$(python3 -c "
+          import re, tomllib
+          deps = tomllib.load(open('backend/pyproject.toml','rb'))['project']['dependencies']
+          print(next(re.fullmatch(r'klartex==(.+)', d).group(1) for d in deps if d.startswith('klartex==')))
+          ")
+          echo "klartex=$klartex" >> "$GITHUB_OUTPUT"
 
       # The host key is pinned via the SSH_KNOWN_HOSTS secret rather than
       # trusting whatever ssh-keyscan returns at deploy time. To rotate
@@ -168,9 +232,10 @@ jobs:
 
       # infra/.env is deliberately excluded: it is gitignored, so it does not
       # exist in this checkout, and --delete would otherwise remove the
-      # server's copy and take the stack down. BACKEND_VERSION is written on
-      # the server instead, in the deploy step below. rsync protects excluded
-      # paths from --delete, so the server's .env survives untouched.
+      # server's copy and take the stack down. BACKEND_VERSION and
+      # KLARTEX_VERSION are written on the server instead, in the deploy step
+      # below. rsync protects excluded paths from --delete, so the server's
+      # .env survives untouched.
       - name: Sync infra and landing page
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
@@ -206,9 +271,10 @@ jobs:
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           VERSION: ${{ steps.version.outputs.version }}
+          KLARTEX: ${{ steps.version.outputs.klartex }}
         run: |
           ssh -i "$HOME/.ssh/deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "klartex@$HOST" "export VERSION='$VERSION' && bash -se" <<'REMOTE'
+            "klartex@$HOST" "export VERSION='$VERSION' KLARTEX='$KLARTEX' && bash -se" <<'REMOTE'
           set -Eeuo pipefail
           cd /home/klartex/klartex
 
@@ -245,17 +311,21 @@ jobs:
           }
           trap restore ERR
 
-          # Record the version in .env so the systemd unit's `docker compose
-          # up -d` resolves the deployed image rather than the previous one.
-          sed -i '/^BACKEND_VERSION=/d' .env
+          # Record both versions in .env so the systemd unit's `docker
+          # compose up -d` resolves the deployed images rather than the
+          # previous ones. KLARTEX_VERSION is not a series of its own: it is
+          # the core this backend was built against, so the pair moves
+          # together and a rollback from an older tag restores both.
+          sed -i '/^BACKEND_VERSION=/d;/^KLARTEX_VERSION=/d' .env
           printf 'BACKEND_VERSION=%s\n' "$VERSION" >> .env
+          printf 'KLARTEX_VERSION=%s\n' "$KLARTEX" >> .env
 
           # The caddy image is built here, not pulled: `docker compose pull`
           # alone would try to fetch klartex-se-caddy:local from a registry.
           if docker compose pull --help | grep -q -- --ignore-buildable; then
               docker compose pull --ignore-buildable
           else
-              docker compose pull backend
+              docker compose pull backend render
           fi
 
           # The systemd unit runs `docker compose up -d`, which does not
@@ -276,7 +346,7 @@ jobs:
           sleep 5
           docker compose ps
           running="$(docker compose ps --services --filter status=running)"
-          for svc in backend caddy; do
+          for svc in backend render caddy; do
               grep -qx "$svc" <<<"$running" || {
                   echo "service $svc is not running after restart"
                   false
@@ -285,17 +355,49 @@ jobs:
 
           # The version the API actually reports has to match what was
           # deployed — a stale container would otherwise pass the checks above.
+          health=""
           for i in 1 2 3 4 5 6; do
-              reported="$(curl -fsS http://127.0.0.1:8000/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+              health="$(curl -fsS http://127.0.0.1:8000/api/health || true)"
+              reported="$(sed -n 's/.*"version":"\([^"]*\)".*/\1/p' <<<"$health")"
               if [[ "$reported" == "$VERSION" ]]; then
                   echo "health check: OK ($reported)"
-                  trap - ERR
-                  exit 0
+                  break
               fi
+              reported=""
               sleep 5
           done
-          echo "health check FAILED — /api/health reports '${reported:-nothing}', expected '$VERSION'" >&2
-          false
+          if [[ -z "$reported" ]]; then
+              echo "health check FAILED — /api/health did not report '$VERSION'" >&2
+              false
+          fi
+
+          # Discovery schemas come from the backend's core, the PDF from the
+          # render service's. They have to be the same version, and the pair
+          # is deployed together, so a mismatch means the render container is
+          # stale — a `docker compose up -d` that did not replace it.
+          backend_core="$(sed -n 's/.*"klartex":"\([^"]*\)".*/\1/p' <<<"$health")"
+          render_core="$(docker compose exec -T render python3 -c \
+              "import json, urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['version'])")"
+          if [[ -z "$backend_core" || "$backend_core" != "$render_core" ]]; then
+              echo "klartex differs — backend '${backend_core:-nothing}', render '${render_core:-nothing}'" >&2
+              false
+          fi
+          echo "klartex check: OK (both on $backend_core)"
+
+          # A live render through the public path, still under the restore
+          # trap: policy, proxy and compiler all answer for themselves. A
+          # healthy pair that cannot actually compile is what this catches.
+          curl -fsS -X POST http://127.0.0.1:8000/api/render \
+              -H 'Content-Type: application/json' \
+              -d '{"template":"_block","data":{"lang":"sv","body":[{"type":"heading","text":"deploy check"}]}}' \
+              > /tmp/deploy-render-check.pdf
+          head -c 4 /tmp/deploy-render-check.pdf | grep -q '%PDF' || {
+              echo "render did not return a PDF"; head -c 200 /tmp/deploy-render-check.pdf; false
+          }
+          echo "render check: OK ($(stat -c%s /tmp/deploy-render-check.pdf) bytes of PDF)"
+          rm -f /tmp/deploy-render-check.pdf
+
+          trap - ERR
           REMOTE
 
       - name: Report version

@@ -1,8 +1,10 @@
 # backend/
 
-FastAPI-app som importerar `klartex` (PyPI) som library och exponerar HTTP-API:t som klartex.se frontend använder.
+FastAPI-app som exponerar HTTP-API:t som klartex.se frontend använder: discovery, auth och nivåpolicy, sidmallsregistret och hela den publika `/api`-ytan.
 
-Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-yta hör hemma här, där webbappens andra beslut (auth, persistens, asset-hantering) också bor.
+Här kompileras ingenting. `POST /api/render` avgör vad anroparen får göra, läser sidmallen ur registret och skickar arbetet vidare till render-tjänsten `ghcr.io/swedev/klartex-render` — kärnans egen artefakt, byggd och publicerad av `swedev/klartex` vid varje release, och den enda process som kör `xelatex`. Den når inte instansens hemligheter, har ingen volym och ligger på ett internt nätverk utan väg ut.
+
+`klartex` är ändå ett beroende här: discovery-scheman läses direkt ur paketet, utan TeX Live. Adressen till render-tjänsten står i `RENDER_URL` (default `http://render:8000`).
 
 ## Endpoints
 
@@ -13,7 +15,7 @@ Ersätter kärnans utfasade `klartex serve` (borttagen i klartex v0.11.0). HTTP-
 | `GET /api/templates/{name}/schema` | JSON Schema för en mall | Nej |
 | `GET /api/blocks` | Lista block-engine-blocktyper | Nej |
 | `GET /api/blocks/{name}/schema` | JSON Schema för en blocktyp | Nej |
-| `POST /api/render` | JSON in, PDF out. Max 2 samtidiga renders — fler ger 503 | Nej — utom `latex`-blocket |
+| `POST /api/render` | JSON in, PDF out via render-tjänsten. Max 2 anrop i luften — fler ger 503 | Nej — utom `latex`-blocket |
 | `GET /api/page-templates` | Lista registrerade sidmalls-bundles | Nej |
 | `GET /api/page-templates/{name}` | Metadata för en bundle | Nej |
 | `POST /api/page-templates` | Registrera eller ersätt en bundle (`.tex.jinja` + assets, base64) | Ja |
@@ -51,8 +53,11 @@ Alla fel efter request-parsningen svarar med ett objekt under `detail`: alltid `
 | `invalid_token` | 401 | Ett token presenterades men stämmer inte | Nej |
 | `token_required` | 403 | Anonymt anrop med ett `latex`-block; `block_type` namnger blocket | Alltid |
 | `token_not_configured` | 503 | Ett token presenterades till en instans som saknar `API_TOKEN` | Nej |
-| `overloaded` | 503 | Båda render-platserna upptagna (se nedan) | Nej |
+| `overloaded` | 503 | Båda platserna upptagna, här eller i render-tjänsten (se nedan) | Nej |
 | `render_error` | 500 | `xelatex` misslyckades | Nej |
+| `render_unavailable` | 502 | Render-tjänsten svarade inte, svarade för långsamt, eller svarade något oanvändbart | Nej |
+
+`502` är det enda felet som tillkommer av att kompileringen ligger i en egen tjänst. Det är alltid säkert att göra om anropet: antingen nådde det aldrig fram, eller så gick svaret förlorat. Meddelandet är generiskt och nämner varken värdnamn eller undantagstext — det som faktiskt hände loggas server-side. Alla övriga fel i tabellen ovan formuleras av kärnan och passerar oförändrade, med sin status, sin `detail` och sin `Retry-After`.
 
 `token_required` och `503` är var för sig tvetydiga: `detail.type` ensam räcker inte, utan en klient som förgrenar på feltyp måste läsa statuskoden också. `token_required` med `401` betyder att headern inte gick att tolka och bär varken `path` eller `block_type`; med `403` betyder den att anropet var giltigt som anonymt men innehåller ett `latex`-block, och då finns båda fälten. `503` betyder antingen `overloaded` eller `token_not_configured`.
 
@@ -74,9 +79,11 @@ Ett request som inte ens matchar `RenderRequest` — t.ex. `data` som inte är e
 
 ## Belastningstak på `/api/render`
 
-En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Endpointen tar därför en av två render-platser innan arbetet börjar. Är båda upptagna svaras `503` direkt — med `Retry-After: 5` och `detail.type = "overloaded"` — i stället för att köa.
+En render startar `xelatex` två gånger med 60 s timeout per körning, så en handfull samtidiga anrop räcker för att mätta en liten VM. Taket på samtidiga kompileringar sitter i render-tjänsten, som svarar `503` med `Retry-After: 5` och `detail.type = "overloaded"` i stället för att köa.
 
-Taket är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet samtidiga renders. Edge-lagret kompletterar med rate limit och body-gräns på `POST /api/render` (se `infra/Caddyfile`), och containern har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
+Endpointen här håller ett lika stort tak på anrop i luften och svarar likadant. Fler anrop skulle ändå bara kunna vänta på render-tjänstens `503`, och två är taket för hur många bundle-payloads som byggs i minnet samtidigt. Båda taken är per process och förutsätter **en** uvicorn-worker per container: fler workers eller repliker multiplicerar antalet.
+
+Tidsbudgeten summerar under proxyns tak: klienten mot render-tjänsten ger upp efter som mest 5 s uppkoppling + 30 s skrivning + 130 s läsning, och Caddy väntar 180 s på svarsheadern. En klient får alltså ett strukturerat fel i stället för en avbruten uppkoppling. Edge-lagret kompletterar med rate limit och body-gräns på `POST /api/render` (se `infra/Caddyfile`), och båda containrarna har CPU-/minnes-/pids-tak i `infra/docker-compose.yml`.
 
 ## Sidmall på `/api/render`
 
@@ -93,14 +100,16 @@ En bundle bär en enda `page_template.tex.jinja` som beskriver hela sidan. Den s
 
 ## Assets i registrerade sidmallar
 
-En sidmall registrerad via `/api/page-templates` sparas som en bundle: `page_template.tex.jinja` plus dess assets i samma katalog. Vid `/api/render` pekas klartex på bundle-katalogen, som blir både sökväg för `TEXINPUTS` och arbetskatalog för xelatex. Det ger två referensformer i mallen:
+En sidmall registrerad via `/api/page-templates` sparas som en bundle: `page_template.tex.jinja` plus dess assets i samma katalog. Vid `/api/render` läses källan och alla assets härifrån och följer med anropet till render-tjänsten som base64. Där skrivs de till en temporär katalog för anropets längd, som blir både sökväg för `TEXINPUTS` och arbetskatalog för xelatex, och raderas när svaret går tillbaka. Det ger två referensformer i mallen:
 
 | Referens i mallen | Löses mot |
 |-------------------|-----------|
-| `\includegraphics{logo.pdf}` | bundle-katalogen först, serverns arbetskatalog som fallback |
-| `\includegraphics{./logo.pdf}` | enbart bundle-katalogen |
+| `\includegraphics{logo.pdf}` | bundlens filer först, render-processens arbetskatalog som fallback |
+| `\includegraphics{./logo.pdf}` | enbart bundlens filer |
 
-Heter en fil likadant i bundlen och i serverns arbetskatalog vinner bundlens kopia. Assets laddas upp med filnamn utan sökvägsseparatorer, så referera dem med just filnamnet — sökvägar uppåt (`../`) pekar utanför bundlen och ingår inte i kontraktet.
+Heter en fil likadant i bundlen och i render-processens arbetskatalog vinner bundlens kopia. Assets laddas upp med filnamn utan sökvägsseparatorer, så referera dem med just filnamnet — sökvägar uppåt (`../`) pekar utanför bundlen och ingår inte i kontraktet.
+
+En bundle vars metadata listar en asset som inte finns på disk, eller vars källa inte är giltig UTF-8, går inte att skicka: anropet svarar `400 input_error` och namnger filen. Ingenting har då nått render-tjänsten.
 
 ## Lokal utveckling
 
@@ -109,8 +118,11 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Kör servern
-uvicorn klartex_se.main:app --reload --port 8000
+# Render-tjänsten, i ett eget skal. Kräver xelatex på PATH.
+klartex serve --port 8001
+
+# Appen, pekad på den
+RENDER_URL=http://localhost:8001 uvicorn klartex_se.main:app --reload --port 8000
 
 # Smoke-test
 curl http://localhost:8000/api/templates | jq '.[].name'
@@ -120,7 +132,9 @@ curl -X POST http://localhost:8000/api/render \
   -o /tmp/test.pdf
 ```
 
-Tester (`xelatex` behövs för render-tester; de hoppas över när det saknas, och samma pytest-svit körs i CI före image-bygget):
+Utan `klartex serve` igång svarar `/api/render` `502 render_unavailable`; discovery och registret fungerar ändå.
+
+Tester behöver ingen render-tjänst: enhetstesterna ersätter proxy-anropet, och `tests/test_contract.py` driver `klartex.server` i samma process. `xelatex` behövs bara för de två testerna som renderar på riktigt, och de hoppas över när det saknas. Samma pytest-svit körs i CI före image-bygget.
 
 ```bash
 pytest
@@ -129,25 +143,21 @@ pytest -k "not render"   # bara discovery-tester (snabbt, ingen xelatex)
 
 ## Docker
 
-Imagen är tvådelad. De tunga, sällan ändrade lagren — TeX Live-basen, apt-paketen, Microsofts kärnfonter och `texlive-bin`-symlänken — bor i basimagen `ghcr.io/swedev/klartex-base`, som byggs och publiceras från `swedev/klartex` (`docker/Dockerfile.base` via dess `base-image.yml`). `Dockerfile` bygger app-imagen ovanpå den: venv med de pinnade beroendena plus `src/`. Ett app-bygge tar därför ett par minuter i stället för att bygga om ~7 GB.
+Imagen bygger på `python:3.12-slim` och installeras ur `pyproject.toml`. Ingen TeX Live: den bor i render-imagen, som byggs på andra sidan. Ett produktrelease flyttar därmed några tiotal megabyte.
 
 ```bash
 docker build -t klartex-se-backend:dev .
-docker run --rm -p 8000:8000 klartex-se-backend:dev
+docker run --rm -p 8000:8000 -e RENDER_URL=http://host.docker.internal:8001 klartex-se-backend:dev
 ```
 
-Basimagen hämtas från GHCR vid bygget. Paketet är publikt, så ingen inloggning behövs.
+Hela stacken lokalt — appen mot en riktig render-tjänst — startas enklast med compose-filen i `infra/`; se `infra/README.md`.
 
-### Bumpa basimagen
+### Kärn-pinnen
 
-1. Bumpa basen i `swedev/klartex` (dess `docker/Dockerfile.base`) och invänta att `base-image.yml` där bygger multi-arch och publicerar en ny tagg, `YYYYMMDD-<run_number>`.
-2. Kopiera image-referensen `ghcr.io/swedev/klartex-base:<tagg>@<digest>` ur publiceringskörningens step-summary. Digesten går också att läsa av med `docker buildx imagetools inspect ghcr.io/swedev/klartex-base:<tagg>`.
-3. Uppdatera `FROM`-raden i `Dockerfile` till den referensen i en egen PR.
-
-Pinnen bär både tagg och digest: taggen för läsbarhet, digesten för att bygget ska vara reproducerbart. Ingen `latest`-tagg publiceras. Publicerade bastaggar får inte raderas så länge någon `Dockerfile` i historiken refererar dem — då går de byggena inte att reproducera.
+`klartex==X.Y.Z` i `pyproject.toml` är den enda platsen kärnversionen står. Render-imagen taggas med samma version (`ghcr.io/swedev/klartex-render:X.Y.Z`), så en kärnbump är att ändra pinnen, spegla den i `KLARTEX_VERSION` i `infra/.env.example` — CI felar annars — och släppa en ny appversion. Deployen skriver båda raderna till serverns `.env`, så paret rullas ut ihop.
 
 ## Deploy
 
-App-imagen byggs av `.github/workflows/deploy.yml`, och bara när en `v*`-tagg pushas: tester, multi-arch-bygge (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`, smoke-test av amd64-imagen innan något publiceras, och därefter utrullning. En push till `main` bygger ingenting — `ci.yml` kör testerna och inget mer.
+App-imagen byggs av `.github/workflows/deploy.yml`, och bara när en `v*`-tagg pushas: tester, multi-arch-bygge (amd64 + arm64) till `ghcr.io/swedev/klartex-se-backend`, smoke-test av amd64-imagen mot en riktig render-container av den pinnade kärnversionen innan något publiceras, och därefter utrullning. En push till `main` bygger ingenting — `ci.yml` kör testerna och inget mer.
 
 För produktion: bumpa `version` i `pyproject.toml` och `__version__` i `src/klartex_se/__init__.py`, merga, och pusha en matchande `v*`-tagg.

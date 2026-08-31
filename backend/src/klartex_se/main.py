@@ -1,5 +1,7 @@
 """FastAPI app entrypoint. Mounts discovery + render routers under /api."""
 
+import importlib.metadata
+
 from fastapi import APIRouter, FastAPI
 
 from klartex_se import __version__
@@ -25,8 +27,18 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.get("/health")
 def health() -> dict:
-    """Liveness probe — used by Docker healthcheck + uptime monitoring."""
-    return {"status": "ok", "version": __version__}
+    """Liveness probe — used by Docker healthcheck + uptime monitoring.
+
+    `klartex` is the installed core version. Discovery schemas come from
+    it and the renderer from the core inside the render service, which
+    reports the same field; a deploy compares the two health answers and
+    fails if they differ.
+    """
+    return {
+        "status": "ok",
+        "version": __version__,
+        "klartex": importlib.metadata.version("klartex"),
+    }
 
 
 api_router.include_router(discovery_router)
