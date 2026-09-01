@@ -451,7 +451,7 @@ jobs:
           mkdir -p /home/klartex/db-backups
           dump="/home/klartex/db-backups/klartex-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
           ( umask 077
-            docker compose exec -T postgres pg_dump -U klartex -d klartex --clean --if-exists \
+            docker compose exec -T postgres pg_dump -U klartex -d klartex --clean --if-exists </dev/null \
               | gzip -c > "$dump" )
           [[ -s "$dump" ]] || { echo "pg_dump produced an empty file" >&2; false; }
           gzip -t "$dump"
@@ -498,7 +498,7 @@ jobs:
           # stale — a `docker compose up -d` that did not replace it.
           backend_core="$(sed -n 's/.*"klartex":"\([^"]*\)".*/\1/p' <<<"$health")"
           render_core="$(docker compose exec -T render python3 -c \
-              "import json, urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['version'])")"
+              "import json, urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['version'])" </dev/null)"
           if [[ -z "$backend_core" || "$backend_core" != "$render_core" ]]; then
               echo "klartex differs — backend '${backend_core:-nothing}', render '${render_core:-nothing}'" >&2
               false
