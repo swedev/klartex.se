@@ -425,7 +425,11 @@ jobs:
           # are forward-only) fails HERE, before production is taken down.
           # --name because the service sets container_name, which `run` would
           # otherwise collide with against the running backend.
-          docker compose run --rm --name klartex-alembic-preflight backend alembic current
+          # </dev/null: this script is bash's stdin (a heredoc), and without
+          # it `docker compose run` attaches the container to that stdin —
+          # every line below becomes alembic's input and never executes,
+          # while the step still exits 0.
+          docker compose run --rm --name klartex-alembic-preflight backend alembic current </dev/null
 
           # stop → dump → migrate → start. Writers must be gone before the
           # schema moves, and the dump is taken with them gone, so it is a
@@ -455,7 +459,8 @@ jobs:
           # Keep the five most recent; the database is small but the disk is not.
           ls -1t /home/klartex/db-backups/klartex-*.sql.gz | tail -n +6 | xargs -r rm -f
 
-          docker compose run --rm --name klartex-alembic-upgrade backend alembic upgrade head
+          # </dev/null for the same heredoc-stdin reason as the preflight.
+          docker compose run --rm --name klartex-alembic-upgrade backend alembic upgrade head </dev/null
           migrated=1
 
           sudo systemctl restart klartex-stack.service

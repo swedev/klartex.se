@@ -1,6 +1,6 @@
 [project]
 name = "klartex-se-backend"
-version = "0.8.0"
+version = "0.8.1"
 description = "HTTP backend for klartex.se — policy and discovery in front of the klartex render service"
 requires-python = ">=3.12"
 dependencies = [
