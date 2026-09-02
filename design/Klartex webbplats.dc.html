@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #FBFAF8; }
+  a { color: #0A55C6; text-decoration: none; }
+  a:hover { color: #071A43; text-decoration: underline; text-underline-offset: 2px; }
+  pre { margin: 0; }
+</style>
+</helmet>
+
+<div style="font-family:'Source Sans 3',system-ui,sans-serif;color:#14161A;background:#FBFAF8">
+
+  <header style="position:relative;overflow:hidden;background:#071A43;color:#FFFFFF">
+      <img src="klartex-blad-arm.svg" alt="" style="position:absolute;left:-150px;top:24px;width:640px;display:block;pointer-events:none">
+      <img src="klartex-blad-omvant.svg" alt="" style="position:absolute;right:-190px;bottom:-170px;width:700px;display:block;pointer-events:none">
+    <div style="position:relative;max-width:1040px;margin:0 auto;padding:36px 40px 64px;box-sizing:border-box">
+      <a href="/" style="display:inline-block;padding-bottom:52px"><img src="klartex-lockup-reverse.svg" alt="klartex" style="width:clamp(132px,13vw,176px);display:block"></a>
+      <h1 style="margin:0;max-width:19ch;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:clamp(34px,5.4vw,58px);line-height:1.04;letter-spacing:-0.022em;color:#FFFFFF;text-wrap:pretty">Skicka strukturerad data, få ett färdigt dokument.</h1>
+      <p style="margin:18px 0 0;max-width:32ch;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 32;font-size:clamp(17px,1.8vw,21px);line-height:1.45;color:#C6D4EC;text-wrap:pretty">Kallelser, protokoll, fakturor och årsredovisningar som PDF.</p>
+
+      <div style="margin-top:44px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-end">
+        <p style="margin:0;flex:1 1 300px;max-width:46ch;font-size:15.5px;line-height:1.6;color:#C6D4EC;text-wrap:pretty">Renderingen finns som ett öppet HTTP-API. Det här anropet fungerar som det står, utan installation och utan konto:</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="/llms.txt" style="display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:3px;background:#FFFFFF;color:#071A43;font-size:14.5px;font-weight:600">llms.txt</a>
+          <a href="https://github.com/swedev/klartex" style="display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(198,212,236,0.4);color:#FFFFFF;font-size:14.5px;font-weight:500">GitHub</a>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;border-radius:4px;background:#04122F;box-shadow:inset 0 0 0 1px rgba(198,212,236,0.2);overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 16px;border-bottom:1px solid rgba(198,212,236,0.16)">
+          <span style="display:flex;align-items:center;gap:9px;min-width:0">
+            <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:2px;background:#0A5FD8;color:#FFFFFF;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em">POST</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#C6D4EC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">app.klartex.se/api/render</span>
+          </span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#7B95C4;flex-shrink:0">curl</span>
+        </div>
+        <div style="padding:16px;overflow-x:auto"><pre style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.75;color:#E8EEF9"><span style="color:#8FA8CE">curl</span> -X POST https://app.klartex.se/api/render \
+  -H <span style="color:#9FD0FF">'Content-Type: application/json'</span> \
+  -d <span style="color:#9FD0FF">'{"template":"faktura","data":{
+        "invoice_number":"2026-001","date":"2026-03-01","due_date":"2026-03-31",
+        "recipient":{"name":"Kundföretaget AB"},
+        "lines":[{"description":"Konsultarbete","quantity":10,"unit":"tim",
+                  "unit_price":1200,"vat_percent":25}]}}'</span> \
+  -o faktura.pdf</pre></div>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1040px;margin:0 auto;padding:0 40px;box-sizing:border-box">
+
+    <section style="padding:72px 0 0">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+        <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.12;letter-spacing:-0.018em;color:#071A43">Två sätt att använda det</h2>
+      </div>
+
+      <div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start">
+
+        <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FFFFFF;padding:26px 28px;display:flex;flex-direction:column;gap:14px">
+          <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:3px;background:#E6EFFD;color:#0A55C6;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.06em;align-self:flex-start">UTAN INSTALLATION</span>
+          <h3 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.01em;color:#071A43">Rendera ett dokument nu</h3>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Anropa <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">app.klartex.se/api</code> som ovan. Ingenting att installera — servern har TeX-installationen. Det här är vägen för enstaka dokument och för agenter som fått i uppgift att producera en PDF.</p>
+        </div>
+
+        <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FFFFFF;padding:26px 28px;display:flex;flex-direction:column;gap:14px">
+          <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:3px;background:#F2F1ED;color:#6B6A63;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.06em;align-self:flex-start">EGEN DRIFT</span>
+          <h3 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.01em;color:#071A43">Bygg in det i din tjänst</h3>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Installera paketet och kör renderingen i din egen miljö:</p>
+          <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FBFAF8;padding:12px 14px;overflow-x:auto"><pre style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;color:#14161A"><span style="color:#6B6A63">$</span> pip install klartex</pre></div>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Kräver Python ≥ 3.12 och en TeX-installation med XeLaTeX — flera gigabyte, oavsett plattform. På macOS: <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">brew install --cask mactex</code>. På Debian/Ubuntu:</p>
+          <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FBFAF8;padding:12px 14px;overflow-x:auto"><pre style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;color:#14161A"><span style="color:#6B6A63">$</span> sudo apt install texlive-xetex texlive-fonts-recommended \
+    texlive-latex-extra texlive-latex-recommended \
+    texlive-science texlive-plain-generic</pre></div>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Värt det när renderingen ska ligga i din egen drift, onödigt för ett enstaka dokument. Backenden bakom <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">app.klartex.se/api</code> är själv exakt det här fallet: den importerar <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">klartex</code> som bibliotek.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="padding:72px 0 0">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+          <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.12;letter-spacing:-0.018em;color:#071A43">Mallar</h2>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B6A63">8 mallar</span>
+      </div>
+
+      <div style="margin-top:24px;border-top:1.5px solid #071A43">
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:11px 0;border-bottom:1px solid #071A43;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#6B6A63">
+          <span>Mall</span><span>Beskrivning</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">_block</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#E6EFFD;color:#0A55C6;font-size:11px;font-weight:600;letter-spacing:0.03em">20 blocktyper</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Blockmotorn — bygg dokumentet fritt av typade block när ingen mall passar</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">balansrakning</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#FBEEE9;color:#9E3B22;font-size:11px;font-weight:600;letter-spacing:0.06em">WIP</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Balansräkning med tillgångar och eget kapital och skulder</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">budgetrapport</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#FBEEE9;color:#9E3B22;font-size:11px;font-weight:600;letter-spacing:0.06em">WIP</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Budgetrapport med kontokoder, budgeterat och utfall</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">faktura</code>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Faktura med artikelrader, moms och betalningsuppgifter</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">kvitto</code>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Kvitto med artikelrader, totalsumma och betalsätt</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">protokoll</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#FBEEE9;color:#9E3B22;font-size:11px;font-weight:600;letter-spacing:0.06em">WIP</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Mötesprotokoll med dagordning, beslut och justerare</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">resultatrakning</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#FBEEE9;color:#9E3B22;font-size:11px;font-weight:600;letter-spacing:0.06em">WIP</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Resultaträkning med jämförelseår och valfri notapparat</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2.2fr);gap:24px;align-items:baseline;padding:15px 0;border-bottom:1px solid #E3E1DB">
+          <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;color:#071A43">sie-exportrapport</code><span style="display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:2px;background:#FBEEE9;color:#9E3B22;font-size:11px;font-weight:600;letter-spacing:0.06em">WIP</span></span>
+          <span style="font-size:15px;line-height:1.55;color:#4A4943;text-wrap:pretty">Läsbar PDF av SIE4-bokföringsdata</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:72px 0 0">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+        <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.12;letter-spacing:-0.018em;color:#071A43">Ta reda på vad som ska skickas</h2>
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Scheman hämtas från API:t — ingenting behöver gissas eller hårdkodas:</p>
+      </div>
+
+      <div style="margin-top:24px;border:1px solid #E3E1DB;border-radius:3px;background:#FFFFFF;overflow:hidden">
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #EFEDE7">
+          <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:2px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;flex-shrink:0">GET</span>
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;color:#071A43">/api/templates</code>
+          <span style="font-size:14px;color:#6B6A63;margin-left:auto">alla mallar</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #EFEDE7">
+          <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:2px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;flex-shrink:0">GET</span>
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;color:#071A43">/api/templates/faktura/schema</code>
+          <span style="font-size:14px;color:#6B6A63;margin-left:auto">JSON Schema för en mall</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #EFEDE7">
+          <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:2px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;flex-shrink:0">GET</span>
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;color:#071A43">/api/blocks</code>
+          <span style="font-size:14px;color:#6B6A63;margin-left:auto">de 20 blocktyperna</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 18px">
+          <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:2px;background:#F2F1ED;color:#4A4943;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:0.06em;flex-shrink:0">GET</span>
+          <code style="font-family:'JetBrains Mono',monospace;font-size:13.5px;color:#071A43">/api/blocks/text/schema</code>
+          <span style="font-size:14px;color:#6B6A63;margin-left:auto">JSON Schema för en blocktyp</span>
+        </div>
+      </div>
+
+      <p style="margin:16px 0 0;font-size:16px;line-height:1.6;color:#4A4943;text-wrap:pretty">Samma information finns i <a href="/llms.txt">llms.txt</a>, skriven för att läsas av AI-agenter.</p>
+    </section>
+
+    <section style="padding:72px 0 0">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+        <h2 style="margin:0;font-family:'Source Serif 4',serif;font-optical-sizing:none;font-variation-settings:'opsz' 60;font-weight:600;font-size:32px;line-height:1.12;letter-spacing:-0.018em;color:#071A43">Vad som är öppet</h2>
+      </div>
+
+      <div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start">
+        <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FFFFFF;padding:24px 26px;display:flex;flex-direction:column;gap:12px">
+          <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:3px;background:#E6EFFD;color:#0A55C6;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.06em;align-self:flex-start">INGEN TOKEN</span>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Rendering och schema-uppslagning är öppna och kräver ingen token. De är avsedda för att prova, för enstaka dokument och för sällananvändning, och renderingsanropen är takade per IP-adress.</p>
+          <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Egen formgivning går också att skicka med per anrop via <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">page_template</code> i objektform, som tar typsnitt och sidfot direkt i datan och fungerar utan token.</p>
+        </div>
+
+        <div style="border:1px solid #E3E1DB;border-radius:3px;background:#FFFFFF;padding:24px 26px;display:flex;flex-direction:column;gap:12px">
+          <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:3px;background:#FBEEE9;color:#9E3B22;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.06em;align-self:flex-start">KRÄVER TOKEN</span>
+          <div style="display:flex;gap:11px;align-items:baseline">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#9E3B22;flex-shrink:0">403</span>
+            <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty"><code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">latex</code>-blocket skickar rå LaTeX vidare till kompilatorn och kräver en token — ett anonymt anrop med ett sådant block svarar <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">403</code> och pekar ut blocket.</p>
+          </div>
+          <div style="display:flex;gap:11px;align-items:baseline">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#9E3B22;flex-shrink:0">401</span>
+            <p style="margin:0;font-size:15.5px;line-height:1.62;color:#4A4943;text-wrap:pretty">Att registrera en <strong style="font-weight:600">egen sidmall</strong> — med logotyp, sidhuvud och sidfot som återanvänds mellan dokument — kräver en token, och <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">POST /api/page-templates</code> svarar <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#F7F6F3;box-shadow:inset 0 0 0 1px #E3E1DB;border-radius:3px;padding:1px 5px">401</code> utan.</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;border-radius:3px;background:#F2F1ED;padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px">
+        <p style="margin:0;max-width:62ch;font-size:15.5px;line-height:1.6;color:#4A4943;text-wrap:pretty"><strong style="font-weight:600">Konton är under utveckling och inte lanserade än</strong>.</p>
+        <a href="mailto:kontakt@klartex.se" style="display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:3px;background:#071A43;color:#FFFFFF;font-size:14.5px;font-weight:500;white-space:nowrap">kontakt@klartex.se</a>
+      </div>
+    </section>
+
+    <div style="height:80px"></div>
+  </main>
+
+  <footer style="position:relative;overflow:hidden;background:#071A43;color:#C6D4EC">
+      <img src="klartex-blad-omvant.svg" alt="" style="position:absolute;right:-120px;bottom:-140px;width:520px;display:block;pointer-events:none">
+    <div style="position:relative;max-width:1040px;margin:0 auto;padding:44px 40px 48px;box-sizing:border-box;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:28px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <img src="klartex-lockup-reverse.svg" alt="klartex" style="width:120px;display:block">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7B95C4">MIT-licens · swedev/klartex</span>
+      </div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;font-size:14.5px">
+        <a href="https://pypi.org/project/klartex/" style="color:#FFFFFF">PyPI</a>
+        <a href="https://github.com/swedev/klartex" style="color:#FFFFFF">GitHub</a>
+        <a href="/llms.txt" style="color:#FFFFFF">llms.txt</a>
+        <a href="mailto:kontakt@klartex.se" style="color:#FFFFFF">kontakt@klartex.se</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+
+</script>
+</body>
+</html>

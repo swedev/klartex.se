@@ -8,6 +8,7 @@ Källdokument för grafisk profil och appdesign. Öppna `.dc.html`-filerna i en 
 |-----|----------|
 | `Klartex grafisk profil.dc.html` | **Auktoriteten.** Logotyp, färgroller, typografi, ikonspråk (Lucide), dokumentmall (brevpapper) och komplementgrafik (bladet). |
 | `Klartex logotyp.dc.html` | Den låsta lockupen: metrik, filer, symbolens placering mot ordmärket, samt rundorna som ledde dit. |
+| `Klartex webbplats.dc.html` | Landningssidan `klartex.se`; `index.html` i repots rot är dess implementation. |
 | `Klartex appvyer.dc.html` | Översikt över webbappens vyer. |
 | `Dokument*.dc.html`, `Dokumentredigering.dc.html` | Dokumentlista, dokumentdetalj, tomt läge och redigeringsvyn. |
 | `Mallar.dc.html`, `Mallredigering.dc.html` | Mallbibliotek och mallredigering. |
