@@ -123,12 +123,20 @@ Tidsbudgeten summerar under proxyns tak: klienten mot render-tjänsten ger upp e
 
 | Form | Betydelse |
 |------|-----------|
-| Sträng | Namnet på en bundle registrerad via `/api/page-templates` |
+| Sträng | Namnet på en sidmall: en bundle registrerad via `/api/page-templates`, eller den inbyggda `exempel` |
 | Objekt | Kärnans slot-form, som skickas vidare som `data.page_template` |
 
 Slot-formen är två oberoende slots, `header` och `footer`. Varje slot är `null` (tom), ett variantnamn eller ett objekt med `variant` och variantens inställningar; en utelämnad slot får ytans default. Formen ägs av kärnan och står i mallens schema (`GET /api/templates/{name}/schema`).
 
 En bundle bär en enda `page_template.tex.jinja` som beskriver hela sidan. Den skickas till kärnan som header-slotens källa och footern sätts till `null`, vilket ger samma sida som en helsidesmall. Bundlen äger därmed båda slotarna: både `header` och `footer` i `data.page_template` får ge vika. Dokumentinställningarna där — `font`, `header_font`, `diff_style`, `page_numbers` och `first_page_header` — gäller oförändrat.
+
+### Inbyggda sidmallar
+
+`src/klartex_se/builtin/<namn>/` bär de sidmallar som följer med backenden: en `page_template.json` med slotarna i kärnans objektform och en beskrivning, plus de assetfiler den refererar. De löses upp med namn som bundles och listas av `GET /api/page-templates` med `"builtin": true`, men de har ingen `.tex.jinja`, kräver ingen token, och namnen är reserverade: `POST` med ett inbyggt namn och `DELETE` på det svarar `409`.
+
+Vid `/api/render` läggs den inbyggdas `header` och `footer` över `data.page_template` — anroparens slotar får ge vika, dokumentinställningarna där (`font`, `margins`, …) gäller oförändrat — och assetsen följer med anropet som base64. Har mallens schema ett eget `logo`-fält (faktura, kvitto) tar logotypen den platsen enligt `body_logo` i definitionen och header-sloten sätts tom; annars sitter logotypen i sidhuvudet.
+
+I dag finns en: `exempel`, demomallen för landningssidan och för den som vill se ett färdigt dokument utan egen formgivning. Logotypen är ordmärket för det fiktiva Exempelbolaget AB, satt i profilens seriff som vektorbanor (`design/exempelbolaget-ordmarke.svg` är källan), och sidfoten bär dess påhittade uppgifter.
 
 ## Assets i registrerade sidmallar
 

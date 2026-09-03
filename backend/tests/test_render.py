@@ -220,6 +220,73 @@ def test_bundle_empties_the_footer_and_keeps_the_other_settings(
     assert data["page_template"] == {"footer": None, "font": "Futura"}
 
 
+# --- Built-in page templates ------------------------------------------------
+
+
+def test_builtin_sets_both_slots_and_carries_its_assets(fake_render):
+    r = post_bundle("exempel")
+
+    assert r.status_code == 200, r.text
+    (_, data), kwargs = fake_render[0]
+    assert kwargs["header_source"] is None
+    assert set(kwargs["assets"]) == {"exempelbolaget.pdf"}
+    slots = data["page_template"]
+    assert slots["header"] == {
+        "variant": "logo",
+        "fields": {"logo": "exempelbolaget.pdf"},
+    }
+    assert slots["footer"]["variant"] == "columns"
+    assert "logo" not in data
+
+
+def test_builtin_wins_over_the_callers_slots_but_keeps_the_settings(
+    fake_render,
+):
+    r = post_bundle(
+        "exempel",
+        data={
+            "body": [{"type": "heading", "text": "x"}],
+            "page_template": {"footer": None, "header": None, "font": "Inter"},
+        },
+    )
+
+    assert r.status_code == 200, r.text
+    (_, data), _ = fake_render[0]
+    slots = data["page_template"]
+    assert slots["font"] == "Inter"
+    assert slots["footer"]["variant"] == "columns"
+    assert slots["header"]["variant"] == "logo"
+
+
+def test_builtin_puts_the_logo_in_the_body_of_a_recipe_that_has_one(
+    fake_render,
+):
+    """faktura places its logo beside the heading; the header stays empty."""
+    r = client.post(
+        "/api/render",
+        json={
+            "template": "faktura",
+            "data": {"sender": {"name": "x"}, "page_template": {"font": "Inter"}},
+            "page_template": "exempel",
+        },
+    )
+
+    assert r.status_code == 200, r.text
+    (_, data), kwargs = fake_render[0]
+    assert data["logo"] == "exempelbolaget.pdf"
+    assert data["logo_height"] == "0.9cm"
+    assert data["page_template"]["header"] is None
+    assert data["page_template"]["footer"]["variant"] == "columns"
+    assert data["page_template"]["font"] == "Inter"
+    assert "exempelbolaget.pdf" in kwargs["assets"]
+
+
+def test_builtin_does_not_consult_the_registry(tmp_path, monkeypatch, fake_render):
+    """A missing registry dir is no obstacle to a built-in name."""
+    monkeypatch.setenv("PAGE_TEMPLATES_DIR", str(tmp_path / "absent"))
+    assert post_bundle("exempel").status_code == 200
+
+
 def test_a_broken_bundle_is_a_400(bundle, tmp_path, fake_render):
     """An asset the metadata lists but disk does not have never travels."""
     name, _, _ = bundle

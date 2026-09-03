@@ -32,6 +32,16 @@ bundle's copy wins. Parent-relative references are out of contract: asset
 filenames carry no path separators, so no bundle can create that layout
 through the API, and the render service rejects such a name outright.
 
+Built-in templates
+------------------
+Alongside the registry, `builtin/<name>/` inside this package holds the
+templates that ship with the backend: a `page_template.json` carrying the
+slots in klartex's object form plus the asset files it references. They
+resolve by name like bundles and appear in the listing, but they are not
+bundles: they carry no `.tex.jinja`, they cannot be created, replaced or
+deleted through the API, and their names are reserved so no bundle can
+shadow them.
+
 Forward-compat note: once orgs+auth land (fas 5), this layout migrates to
 /data/orgs/<org>/page-templates/<name>/. The same internal API stays.
 """
@@ -70,6 +80,70 @@ class PageTemplateNotFound(KeyError):
     """No registered template with that name."""
 
 
+class PageTemplateReserved(PageTemplateError):
+    """The name belongs to a built-in template, which the API cannot write."""
+
+
+BUILTIN_DIR = Path(__file__).parent / "builtin"
+BUILTIN_FILENAME = "page_template.json"
+
+
+def builtin_names() -> list[str]:
+    """Names of the templates that ship with the backend, sorted."""
+    if not BUILTIN_DIR.exists():
+        return []
+    return sorted(
+        entry.name
+        for entry in BUILTIN_DIR.iterdir()
+        if entry.is_dir() and (entry / BUILTIN_FILENAME).exists()
+    )
+
+
+def is_builtin(name: str) -> bool:
+    return name in builtin_names()
+
+
+def _builtin_definition(name: str) -> dict:
+    return json.loads(
+        (BUILTIN_DIR / name / BUILTIN_FILENAME).read_text(encoding="utf-8")
+    )
+
+
+def _builtin_metadata(name: str) -> dict:
+    definition = _builtin_definition(name)
+    asset_names = sorted(
+        entry.name
+        for entry in (BUILTIN_DIR / name).iterdir()
+        if entry.is_file() and entry.name != BUILTIN_FILENAME
+    )
+    return {
+        "name": name,
+        "description": definition.get("description"),
+        "builtin": True,
+        "asset_names": asset_names,
+    }
+
+
+def load_builtin(name: str) -> tuple[dict, dict, dict[str, str]]:
+    """Return a built-in as (page-template slots, body fields, assets).
+
+    The slots are klartex's object form and go under `data.page_template`.
+    The body fields (`body_logo`) are the recipe-level logo settings for
+    templates whose schema takes a body logo; the render endpoint decides
+    whether they apply. Assets are base64 by filename, the form the render
+    service takes.
+    """
+    if not is_builtin(name):
+        raise PageTemplateNotFound(name)
+    definition = _builtin_definition(name)
+    assets = {
+        entry.name: base64.b64encode(entry.read_bytes()).decode()
+        for entry in (BUILTIN_DIR / name).iterdir()
+        if entry.is_file() and entry.name != BUILTIN_FILENAME
+    }
+    return definition["page_template"], definition.get("body_logo") or {}, assets
+
+
 def _root() -> Path:
     return Path(os.environ.get("PAGE_TEMPLATES_DIR", "/data/page-templates"))
 
@@ -83,11 +157,11 @@ def _bundle_dir(name: str) -> Path:
 
 
 def list_bundles() -> list[dict]:
-    """Return all registered page templates as metadata dicts."""
+    """Return all page templates as metadata dicts, built-ins first."""
+    out = [_builtin_metadata(name) for name in builtin_names()]
     root = _root()
     if not root.exists():
-        return []
-    out = []
+        return out
     for entry in sorted(root.iterdir()):
         if entry.is_dir() and (entry / METADATA_FILENAME).exists():
             out.append(_load_metadata(entry))
@@ -95,7 +169,9 @@ def list_bundles() -> list[dict]:
 
 
 def get_bundle(name: str) -> dict:
-    """Return metadata for a single bundle. Raises PageTemplateNotFound."""
+    """Return metadata for a single template. Raises PageTemplateNotFound."""
+    if is_builtin(name):
+        return _builtin_metadata(name)
     d = _bundle_dir(name)
     if not d.exists() or not (d / METADATA_FILENAME).exists():
         raise PageTemplateNotFound(name)
@@ -180,6 +256,10 @@ def save_bundle(
 ) -> dict:
     """Create or replace a bundle. Returns the saved metadata."""
     d = _bundle_dir(name)
+    if is_builtin(name):
+        raise PageTemplateReserved(
+            f"Page template {name!r} is built in and cannot be replaced"
+        )
     if d.exists() and not overwrite:
         raise PageTemplateExists(
             f"Page template {name!r} already exists; set overwrite=true to replace"
@@ -244,6 +324,10 @@ def save_bundle(
 
 def delete_bundle(name: str) -> None:
     d = _bundle_dir(name)
+    if is_builtin(name):
+        raise PageTemplateReserved(
+            f"Page template {name!r} is built in and cannot be deleted"
+        )
     if not d.exists():
         raise PageTemplateNotFound(name)
     shutil.rmtree(d)
