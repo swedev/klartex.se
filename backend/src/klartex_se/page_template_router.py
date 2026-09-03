@@ -8,6 +8,7 @@ from klartex_se.page_templates import (
     PageTemplateError,
     PageTemplateExists,
     PageTemplateNotFound,
+    PageTemplateReserved,
     delete_bundle,
     get_bundle,
     list_bundles,
@@ -42,13 +43,13 @@ class CreateBundle(BaseModel):
 
 @router.get("")
 def list_() -> list[dict]:
-    """List all registered page templates. Public."""
+    """List all page templates, built-ins first. Public."""
     return list_bundles()
 
 
 @router.get("/{name}")
 def get(name: str) -> dict:
-    """Metadata for one bundle. Public."""
+    """Metadata for one page template. Public."""
     try:
         return get_bundle(name)
     except PageTemplateNotFound as e:
@@ -79,7 +80,10 @@ AUTH_RESPONSES = {
     responses=AUTH_RESPONSES,
 )
 def create(req: CreateBundle, _: None = Depends(require_api_token)) -> dict:
-    """Create or replace a page-template bundle. Requires `API_TOKEN`."""
+    """Create or replace a page-template bundle. Requires `API_TOKEN`.
+
+    Built-in names are reserved and answer `409`.
+    """
     try:
         return save_bundle(
             name=req.name,
@@ -88,7 +92,7 @@ def create(req: CreateBundle, _: None = Depends(require_api_token)) -> dict:
             description=req.description,
             overwrite=req.overwrite,
         )
-    except PageTemplateExists as e:
+    except (PageTemplateExists, PageTemplateReserved) as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
     except PageTemplateError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
@@ -105,5 +109,7 @@ def delete(name: str, _: None = Depends(require_api_token)) -> None:
         delete_bundle(name)
     except PageTemplateNotFound as e:
         raise HTTPException(404, f"Page template {name!r} not found") from e
+    except PageTemplateReserved as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
     except PageTemplateError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e

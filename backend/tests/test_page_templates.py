@@ -38,12 +38,54 @@ def b64(data: bytes | str) -> str:
 
 # --- Storage layer ----------------------------------------------------------
 
+def registered(bundles: list[dict]) -> list[dict]:
+    return [b for b in bundles if not b.get("builtin")]
+
+
 def test_save_and_list():
     pt.save_bundle("vkf", b64("\\fancyhead{VKF}"), {"logo.pdf": b64(b"%PDF-fake")})
-    bundles = pt.list_bundles()
+    bundles = registered(pt.list_bundles())
     assert len(bundles) == 1
     assert bundles[0]["name"] == "vkf"
     assert bundles[0]["asset_names"] == ["logo.pdf"]
+
+
+# --- Built-in templates -----------------------------------------------------
+
+
+def test_builtins_are_listed_first_and_marked():
+    pt.save_bundle("aaa", b64("x"), {})
+    names = [b["name"] for b in pt.list_bundles()]
+    assert names[: len(pt.builtin_names())] == pt.builtin_names()
+    assert "exempel" in names
+    assert pt.get_bundle("exempel")["builtin"] is True
+
+
+def test_exempel_metadata_lists_its_logo():
+    meta = pt.get_bundle("exempel")
+    assert meta["asset_names"] == ["exempelbolaget.pdf"]
+    assert "Exempelbolaget" in meta["description"]
+
+
+def test_load_builtin_returns_slots_body_logo_and_assets():
+    slots, body_logo, assets = pt.load_builtin("exempel")
+    assert slots["footer"]["variant"] == "columns"
+    assert slots["footer"]["fields"]["company"] == "Exempelbolaget AB"
+    assert body_logo["logo"] == "exempelbolaget.pdf"
+    assert base64.b64decode(assets["exempelbolaget.pdf"]).startswith(b"%PDF")
+
+
+def test_load_builtin_unknown_is_not_found():
+    with pytest.raises(pt.PageTemplateNotFound):
+        pt.load_builtin("vkf")
+
+
+def test_builtin_name_cannot_be_saved_or_deleted():
+    with pytest.raises(pt.PageTemplateReserved):
+        pt.save_bundle("exempel", b64("x"), {}, overwrite=True)
+    with pytest.raises(pt.PageTemplateReserved):
+        pt.delete_bundle("exempel")
+    assert pt.get_bundle("exempel")["builtin"] is True
 
 
 def test_get_returns_metadata_not_content():
@@ -209,10 +251,30 @@ def test_load_bundle_payload_reports_metadata_vanishing_as_not_found(monkeypatch
 
 # --- HTTP routes ------------------------------------------------------------
 
-def test_list_empty(client):
+def test_list_without_registrations_holds_only_the_builtins(client):
     r = client.get("/api/page-templates")
     assert r.status_code == 200
-    assert r.json() == []
+    assert [b["name"] for b in r.json()] == pt.builtin_names()
+    assert all(b["builtin"] for b in r.json())
+
+
+def test_get_builtin_is_public(client):
+    r = client.get("/api/page-templates/exempel")
+    assert r.status_code == 200
+    assert r.json()["builtin"] is True
+
+
+def test_create_over_a_builtin_name_is_a_409(client):
+    body = {"name": "exempel", "template": b64("x"), "overwrite": True}
+    r = client.post("/api/page-templates", json=body, headers=AUTH)
+    assert r.status_code == 409
+    assert "built in" in r.json()["detail"]
+
+
+def test_delete_of_a_builtin_is_a_409(client):
+    r = client.delete("/api/page-templates/exempel", headers=AUTH)
+    assert r.status_code == 409
+    assert client.get("/api/page-templates/exempel").status_code == 200
 
 
 def test_create_requires_api_token(client):
@@ -278,7 +340,7 @@ def test_create_then_get_then_delete(client):
     assert r.json()["description"] == "demo bundle"
 
     r = client.get("/api/page-templates")
-    assert {b["name"] for b in r.json()} == {"demo"}
+    assert {b["name"] for b in registered(r.json())} == {"demo"}
 
     r = client.delete("/api/page-templates/demo", headers=AUTH)
     assert r.status_code == 204

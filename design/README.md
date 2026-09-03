@@ -19,6 +19,7 @@ Källdokument för grafisk profil och appdesign. Öppna `.dc.html`-filerna i en 
 | `klartex-wordmark.svg` | Ordmärket ensamt. |
 | `klartex-symbol-v2*.svg` | Symbolen ensam, beskuren till bläck (viewBox 569 × 646), standard och negativ. |
 | `klartex-symbol*.svg` | Symbolen med luft runt om (viewBox 610 × 675), samma path; används i vyerna där symbolen behöver marginal. |
+| `exempelbolaget-ordmarke.svg` | Ordmärket för det fiktiva Exempelbolaget AB, satt i Klartex Serif 600 som vektorbanor. Källan till logotypen i backendens inbyggda sidmall `exempel` (`backend/src/klartex_se/builtin/exempel/exempelbolaget.pdf`). |
 | `klartex-blad*.svg` | Komplementgrafiken: bladet med tät rot, tät spets (`-omvant`) respektive armen (`-arm`). Endast på marint underlag; skalas fritt, roteras eller speglas aldrig. |
 
 Snabbreferens (detaljer i profildokumentet):

@@ -1,0 +1,21 @@
+{
+  "description": "Demo page template for trying klartex: the wordmark of the fictitious Exempelbolaget AB as logo, and its made-up company and payment details in the columns footer. Built in and public; cannot be replaced or deleted.",
+  "page_template": {
+    "header": {"variant": "logo", "fields": {"logo": "exempelbolaget.pdf"}},
+    "footer": {
+      "variant": "columns",
+      "fields": {
+        "company": "Exempelbolaget AB",
+        "address": ["Exempelgatan 1", "123 45 Exempelstad"],
+        "seat": "Exempelstad",
+        "org_number": "556000-0000",
+        "vat_number": "SE556000000001",
+        "f_tax": true,
+        "email": "faktura@exempelbolaget.se",
+        "web": "exempelbolaget.se",
+        "bankgiro": "000-0000"
+      }
+    }
+  },
+  "body_logo": {"logo": "exempelbolaget.pdf", "logo_height": "0.9cm"}
+}

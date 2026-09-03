@@ -5,14 +5,18 @@ caller is allowed to render, resolves the page template against the
 registry, and proxies the work to the render service, which is the only
 process that runs xelatex.
 
-Three modes for the page template:
+Four modes for the page template:
 
 1. `page_template: "vkf"` — name of a bundle registered via
    /api/page-templates. Its tex.jinja owns the header slot, and its source
    and assets travel inline with the render call.
-2. `page_template: {...}` — klartex's slot form, passed through as
+2. `page_template: "exempel"` — name of a template built into the backend.
+   Its slots are merged over data["page_template"] and its assets travel
+   inline; for a recipe with a body logo (faktura, kvitto) the logo goes
+   into the body's logo slot and the header slot is left empty.
+3. `page_template: {...}` — klartex's slot form, passed through as
    data["page_template"].
-3. `page_template: null` — whichever default klartex picks for the
+4. `page_template: null` — whichever default klartex picks for the
    surface.
 
 Error shapes come from the render service and pass through unchanged, so
@@ -32,11 +36,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from klartex.renderer import get_registry
+
 from klartex_se.auth import TOKEN_HOWTO, Tier, render_tier
 from klartex_se.page_templates import (
     PageTemplateError,
     PageTemplateNotFound,
     get_bundle_path,
+    is_builtin,
+    load_builtin,
     load_bundle_payload,
 )
 from klartex_se.render_client import RenderUpstreamError, render_pdf
@@ -129,13 +137,16 @@ class RenderRequest(BaseModel):
     page_template: str | dict | None = Field(
         None,
         description=(
-            "Either a registered bundle name (see /api/page-templates) or a "
+            "Either a page-template name (see /api/page-templates: a "
+            "registered bundle, or a built-in such as `exempel`) or a "
             "page-template object in klartex's slot form, which is passed "
             "through as `data.page_template`. A bundle owns the header slot "
-            "and empties the footer. If null, klartex picks the default for "
-            "the surface."
+            "and empties the footer; a built-in sets both slots and keeps "
+            "the document-level settings. If null, klartex picks the "
+            "default for the surface."
         ),
         examples=[
+            "exempel",
             "vkf",
             {
                 "header": {
@@ -145,6 +156,35 @@ class RenderRequest(BaseModel):
             },
         ],
     )
+
+
+def _takes_body_logo(template: str) -> bool:
+    """Whether the template's schema has a `logo` field of its own.
+
+    faktura and kvitto place a logo in the document body, in line with the
+    heading; a built-in page template puts its logo there rather than in
+    the header slot when the recipe offers the place.
+    """
+    info = get_registry().get(template)
+    if info is None:
+        return False
+    return "logo" in (info.schema.get("properties") or {})
+
+
+def _apply_builtin(template: str, data: dict, name: str) -> tuple[dict, dict]:
+    """Merge the built-in page template `name` into `data`.
+
+    Returns the new data and the built-in's assets. The built-in's slots
+    win over any `header` / `footer` in `data.page_template`; the
+    document-level settings there (font, margins, ...) stay.
+    """
+    slots, body_logo, assets = load_builtin(name)
+    current = data.get("page_template")
+    merged = {**(current if isinstance(current, dict) else {}), **slots}
+    if body_logo and _takes_body_logo(template):
+        merged["header"] = None
+        return {**data, **body_logo, "page_template": merged}, assets
+    return {**data, "page_template": merged}, assets
 
 
 def _unknown_page_template(name: str) -> HTTPException:
@@ -225,10 +265,13 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
 
     data = req.data
     bundle: str | None = None
+    assets: dict[str, str] = {}
 
     if isinstance(req.page_template, dict):
         # Klartex resolves the slots internally from data.page_template.
         data = {**data, "page_template": req.page_template}
+    elif req.page_template and is_builtin(req.page_template):
+        data, assets = _apply_builtin(req.template, data, req.page_template)
     elif req.page_template:
         # Existence is policy and settled here; the bundle's contents are
         # read inside the semaphore, where the memory they take is
@@ -264,7 +307,6 @@ def render(req: RenderRequest, tier: Tier = Depends(render_tier)) -> Response:
 
     try:
         header_source: str | None = None
-        assets: dict[str, str] = {}
         if bundle is not None:
             try:
                 header_source, assets = load_bundle_payload(bundle)
