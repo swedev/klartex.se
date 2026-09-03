@@ -556,7 +556,7 @@
   -H <span class="str">'Content-Type: application/json'</span> \
   -d <span class="str">'{"template":"faktura","data":{
         "invoice_number":"2026-001","date":"2026-03-01","due_date":"2026-03-31",
-        "recipient":{"name":"Kundföretaget AB"},
+        "sender":{"name":"Exempelbolaget AB"},"recipient":{"name":"Kundföretaget AB"},
         "lines":[{"description":"Konsultarbete","quantity":10,"unit":"tim",
                   "unit_price":1200,"vat_percent":25}]}}'</span> \
   -o faktura.pdf</code></pre>

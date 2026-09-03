@@ -4,7 +4,7 @@ version = "0.9.1"
 description = "HTTP backend for klartex.se — policy and discovery in front of the klartex render service"
 requires-python = ">=3.12"
 dependencies = [
-    "klartex==0.18.0",
+    "klartex==0.19.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",

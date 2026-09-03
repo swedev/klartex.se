@@ -46,6 +46,12 @@ klartex schema faktura
   "invoice_number": "2026-001",
   "date": "2026-02-15",
   "due_date": "2026-03-17",
+  "sender": {
+    "name": "Mitt Företag AB",
+    "org_number": "556999-8888",
+    "address_line1": "Storgatan 1",
+    "address_line2": "123 45 Stockholm"
+  },
   "recipient": {
     "name": "Kundföretaget AB",
     "org_number": "556123-4567",
@@ -98,7 +104,7 @@ Use `klartex schema _block` to get the full JSON Schema, or query individual blo
 
 Every recipe template accepts `page_template` in object form, the same shape the block engine uses: two independent slots, `header` and `footer`, alongside the document-level settings `font` and `header_font` (fontspec family names; `header_font` falls back to `font`), `page_numbers`, `first_page_header` and `diff_style`. Each slot is `null` for empty, a variant name, or an object with `variant` and that variant's settings. Header variants are `letterhead` (organisation details on the left, logo on the right; `fields.org_name` is required in the object form) and `logo` (logo only). Footer variants are `pagenumber` (page number, preceded by the document title when `title` is set) and `columns` (three aligned columns of company, contact and payment details in `fields`). A slot left out takes the surface's default: an empty header and the page-number footer on the block engine, the letterhead header and the page-number footer with the document title in recipes.
 
-`faktura` and `kvitto` additionally take a top-level `footer` — the canonical place for payment details, taking precedence over the page template's footer — plus `sender` (an issuer block beside the recipient) and `logo` / `logo_height` / `logo_offset` in the header.
+`faktura` and `kvitto` require `sender` with `name` (the issuer, shown in a block beside the recipient; without `logo`, `sender.name` is also set as a wordmark in the logo slot), and take `logo` / `logo_height` / `logo_offset` in the header. Their default footer is the `columns` variant, derived from `sender` (name, address, org number) and the payment fields `bankgiro` / `plusgiro` / `iban` / `bic`; a column whose data is missing is rendered with a grey label (*Betalningsuppgifter saknas*, *Org.nr saknas*, *Adress saknas*) rather than dropped. Company, contact and payment details belong in `page_template.footer.fields` — a `page_template.footer` sent by the producer is merged key by key over the derived one, and there is no top-level `footer` on these recipes (the schema rejects it and points at the slot).
 
 ## Page templates: per-call or registered
 
