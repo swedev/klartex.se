@@ -1,26 +1,25 @@
 # Klartex
 
-> PDF generation via LaTeX — structured data in, professional documents out.
+> PDF generation via LaTeX — structured data in, professional documents out. Render through the public HTTP API at https://app.klartex.se: no install, no TeX, no account.
 
-Klartex is an open-source CLI tool and Python library that generates professional PDF documents from JSON data. It uses XeLaTeX under the hood.
+Klartex generates professional PDF documents from JSON data. To create a document, call the public API — it renders every template without installing anything and without a token. The same renderer is also an open-source Python package and CLI (`pip install klartex`), but that needs a multi-gigabyte TeX Live install; use it only to run klartex inside your own environment (see "Running klartex locally" at the end).
 
-## Quick start
+## Render a PDF
 
-```bash
-pip install klartex
-```
-
-Requires XeLaTeX: `brew install --cask mactex` on macOS, or on Debian/Ubuntu `apt install texlive-xetex texlive-fonts-recommended texlive-latex-extra texlive-latex-recommended texlive-science texlive-plain-generic`.
-
-## Generate a PDF
+`POST https://app.klartex.se/api/render` with a body of `{"template": "<template name>", "data": { ... }}` answers `200` with the PDF (`application/pdf`).
 
 ```bash
-# Write JSON data to a file, then render
-klartex -t faktura -d invoice.json
-
-# Or pipe JSON via stdin
-echo '{"invoice_number": "2026-001", ...}' | klartex -t faktura
+curl -X POST https://app.klartex.se/api/render \
+  -H 'Content-Type: application/json' \
+  -o faktura.pdf \
+  -d '{"template": "faktura", "data": {
+        "invoice_number": "1", "date": "2026-10-01", "due_date": "2026-10-31",
+        "sender": {"name": "Mitt Företag AB"},
+        "recipient": {"name": "Kundföretaget AB"},
+        "lines": [{"description": "Consulting", "quantity": 1, "unit_price": 800, "vat_percent": 25}]}}'
 ```
+
+Invalid data answers `400` with JSON naming the problem and where it is: `{"detail": {"type": "validation_error", "message": "'date' is a required property", "path": []}}`.
 
 ## Available templates
 
@@ -35,8 +34,10 @@ echo '{"invoice_number": "2026-001", ...}' | klartex -t faktura
 
 ## Get the JSON Schema for a template
 
+`GET https://app.klartex.se/api/templates` lists the templates, and `GET https://app.klartex.se/api/templates/{name}/schema` returns the JSON Schema for one — the authoritative description of what `data` takes.
+
 ```bash
-klartex schema faktura
+curl https://app.klartex.se/api/templates/faktura/schema
 ```
 
 ## Invoice example (template: faktura)
@@ -72,7 +73,7 @@ klartex schema faktura
 }
 ```
 
-Save as `invoice.json`, then run: `klartex -t faktura -d invoice.json`
+Send it as `data` with `"template": "faktura"` to `POST /api/render`.
 
 ## Block engine example (template: _block)
 
@@ -92,13 +93,13 @@ Save as `invoice.json`, then run: `klartex -t faktura -d invoice.json`
 }
 ```
 
-Save as `doc.json`, then run: `klartex -d doc.json`
+Send it as `data` with `"template": "_block"` to `POST /api/render`.
 
 ## Block types (for _block template)
 
 agenda, budgettabell, callout, clause, columns, description_list, form, heading, latex, list, name_roster, notapparat, page_break, parties, quote, resultatrakning, signatures, table, text, title_page
 
-Use `klartex schema _block` to get the full JSON Schema, or query individual block schemas via the HTTP API at https://app.klartex.se (`GET /api/blocks`, `GET /api/blocks/{name}/schema`).
+`GET https://app.klartex.se/api/templates/_block/schema` returns the full JSON Schema, and `GET /api/blocks` / `GET /api/blocks/{name}/schema` list the block types and return one block's schema.
 
 ## Page setup and branding in recipes
 
@@ -132,8 +133,21 @@ Whole paragraphs take `revision` on the `text` block instead: `"revision": "adde
 
 Amounts and quantities render in Swedish style by default (`32 400,00` — thin-space grouping, decimal comma). The document language picks the style; `number_format` (`sv` or `en`) in `faktura` / `kvitto` data overrides it.
 
+## Running klartex locally
+
+Only needed to run klartex inside your own environment rather than through the API.
+
+```bash
+pip install klartex
+klartex -t faktura -d invoice.json     # or pipe the JSON on stdin
+klartex schema faktura                 # the same schemas the API serves
+```
+
+Rendering needs XeLaTeX: `brew install --cask mactex` on macOS, or a full TeX Live elsewhere. A minimal TeX Live needs the packages in https://github.com/swedev/klartex/blob/main/.github/tl_packages (`tlmgr install`) — a distribution's `texlive-xetex` alone is missing `ulem`, `tcolorbox` and `siunitx`. Without a TeX install, the render image `ghcr.io/swedev/klartex-render:<version>` (one tag per klartex release, no `latest`) serves the same `POST /render` locally: `docker run --rm -p 127.0.0.1:8000:8000 ghcr.io/swedev/klartex-render:<version>`.
+
 ## Links
 
+- API: https://app.klartex.se
 - PyPI: https://pypi.org/project/klartex/
 - GitHub: https://github.com/swedev/klartex
 - Homepage: https://klartex.se
